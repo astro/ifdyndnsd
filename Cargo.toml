@@ -1,0 +1,14 @@
+[package]
+name = "dyndns6d"
+version = "0.1.0"
+authors = ["Astro <astro@spaceboyz.net>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+futures = "0.3"
+tokio = { version = "1.5", features = ["full", "rt"] }
+rtnetlink = "0.7"
+netlink-packet-route = "0.7"
+
