@@ -7,7 +7,7 @@ use trust_dns_client::tcp::TcpClientStream;
 use trust_dns_client::udp::UdpClientStream;
 use trust_dns_client::client::{Client, AsyncClient, ClientHandle};
 use trust_dns_client::rr::{DNSClass, Name, RData, Record, RecordType};
-use trust_dns_client::op::{Message, MessageFinalizer, ResponseCode};
+use trust_dns_client::op::{Message, MessageFinalizer, MessageVerifier, ResponseCode};
 use trust_dns_client::rr::dnssec::{Algorithm, KeyPair};
 use trust_dns_client::rr::rdata::key::{KeyUsage, KEY};
 use trust_dns_client::proto::error::ProtoResult;
@@ -36,11 +36,11 @@ struct Signer {
 }
 
 impl MessageFinalizer for Signer {
-    fn finalize_message(&self, message: &Message, current_time: u32) -> ProtoResult<Vec<Record>> {
+    fn finalize_message(&self, message: &Message, current_time: u32) -> ProtoResult<(Vec<Record>, Option<MessageVerifier>)> {
         println!("finalize {:?}", message);
         let unix_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
         let record = tsig::create_signature(&message, unix_time.as_secs(), &self.key).unwrap();
-        Ok(vec![record])
+        Ok((vec![record], None))
     }
     
 }
@@ -61,6 +61,7 @@ pub async fn update() -> Result<(), String> {
     );
     let client = AsyncClient::connect(stream);
     let (mut client, bg) = client.await?;
+    client.disable_edns();
 
     tokio::spawn(bg);
 
