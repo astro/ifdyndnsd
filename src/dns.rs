@@ -58,22 +58,29 @@ impl DnsServer {
         Err(format!("No record"))
     }
 
-    pub async fn update(&mut self, name: &str, addr: IpAddr) -> Result<(), String> {
+    pub async fn update(&mut self, hostname: &str, addr: IpAddr) -> Result<(), String> {
         let rdata = match addr {
             IpAddr::V4(addr) => RData::A(addr),
             IpAddr::V6(addr) => RData::AAAA(addr),
         };
-        let rec = Record::from_rdata(Name::from_str(name)?, 0, rdata);
-        let origin = Name::from_str("dyn.spaceboyz.net")?;
-        // let query = self.client.delete_rrset(rec, origin);
-        let query = self.client.append(rec, origin, false);
+        let name = Name::from_str(hostname)?;
+        let origin = name.base_name();
+        let rec = Record::from_rdata(name, 0, rdata);
+        let query = self.client.delete_rrset(rec.clone(), origin.clone());
         let response = query.await
             .map_err(|e| format!("{}", e))?;
 
         if response.response_code() != ResponseCode::NoError {
             Err(format!("Response code: {}", response.response_code()))?;
         }
-        println!("res: {:?}", response);
+        let query = self.client.append(rec, origin, false);
+        println!("DNS update: {} {}", hostname, addr);
+        let response = query.await
+            .map_err(|e| format!("{}", e))?;
+
+        if response.response_code() != ResponseCode::NoError {
+            Err(format!("Response code: {}", response.response_code()))?;
+        }
         Ok(())
     }
 }

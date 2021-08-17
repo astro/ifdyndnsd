@@ -4,7 +4,7 @@ mod dns;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv6Addr};
 use std::rc::Rc;
 use std::str::FromStr;
 use std::time::Duration;
@@ -15,6 +15,7 @@ use trust_dns_client::rr::RecordType;
 struct RecordState {
     server: Rc<RefCell<dns::DnsServer>>,
     hostname: String,
+    neighbors: HashMap<String, Ipv6Addr>,
 
     addr: Option<IpAddr>,
     scope: IpCidr,
@@ -26,6 +27,8 @@ impl RecordState {
         RecordState {
             server,
             hostname: iface.name.clone(),
+            neighbors: iface.neighbors
+                .unwrap_or_else(|| HashMap::new()),
 
             addr: None,
             scope: IpCidr::from_str(match &iface.scope {
@@ -79,6 +82,20 @@ impl RecordState {
 
         server.update(&self.hostname, self.addr.unwrap()).await
             .unwrap_or_else(|e| println!("{}", e));
+
+        if let Some(IpAddr::V6(addr)) = self.addr {
+            for (neighbor_name, neighbor_addr) in self.neighbors.iter() {
+                let net_segs = addr.segments();
+                let host_segs = neighbor_addr.segments();
+                let addr = Ipv6Addr::new(
+                    net_segs[0], net_segs[1], net_segs[2], net_segs[3],
+                    host_segs[4], host_segs[5], host_segs[6], host_segs[7],
+                );
+
+                server.update(neighbor_name, addr.into()).await
+                    .unwrap_or_else(|e| println!("{}", e));
+            }
+        }
     }
 }
 
