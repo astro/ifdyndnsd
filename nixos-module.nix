@@ -41,6 +41,8 @@
           ExecStart = "${cfg.package}/bin/ifdyndnsd ${configFile}";
           User = cfg.user;
           Group = cfg.group;
+          Restart = "always";
+          RestartSec = "1s";
         };
       };
     };
