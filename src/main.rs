@@ -2,25 +2,33 @@ mod config;
 mod ifaces;
 mod dns;
 
-use std::collections::HashMap;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::rc::Rc;
 use std::str::FromStr;
 use std::time::Duration;
 use cidr::IpCidr;
 use tokio::time::timeout;
+use trust_dns_client::rr::RecordType;
 
 struct RecordState {
+    server: Rc<RefCell<dns::DnsServer>>,
     key: Rc<config::TsigKey>,
+    hostname: String,
+
     addr: Option<IpAddr>,
     scope: IpCidr,
     dirty: bool,
 }
 
 impl RecordState {
-    fn new(iface: config::Interface, key: Rc<config::TsigKey>, default_scope: &str) -> Self {
+    fn new(iface: config::Interface, server: Rc<RefCell<dns::DnsServer>>, key: Rc<config::TsigKey>, default_scope: &str) -> Self {
         RecordState {
+            server,
             key,
+            hostname: iface.name.clone(),
+
             addr: None,
             scope: IpCidr::from_str(match &iface.scope {
                 Some(s) => s,
@@ -44,6 +52,36 @@ impl RecordState {
         self.addr = Some(addr);
         self.dirty = true;
     }
+
+    async fn update(&mut self) {
+        self.dirty = false;
+
+        let record_type;
+        match self.addr {
+            None => return,
+            Some(IpAddr::V4(_)) =>
+                record_type = RecordType::A,
+            Some(IpAddr::V6(_)) =>
+                record_type = RecordType::AAAA,
+        };
+
+        let mut server = self.server.borrow_mut();
+        match server.query(&self.hostname, record_type).await {
+            Ok(addr) if Some(addr) == self.addr => {
+                println!("No address change for {}: {}", self.hostname, addr);
+                return;
+            }
+            Ok(addr) => {
+                println!("Outdated address for {}: {}", self.hostname, addr);
+            }
+            Err(e) => {
+                println!("Error querying for {} {}: {}", record_type, self.hostname, e);
+            }
+        }
+
+        server.update(&self.hostname, self.addr.unwrap()).await
+            .map_err(|e| println!("{}", e));
+    }
 }
 
 const IDLE_TIMEOUT: u64 = 1000;
@@ -62,24 +100,27 @@ async fn main() -> Result<(), String> {
     let keys = config.keys.into_iter()
         .map(|(name, key)| (name, Rc::new(key)))
         .collect::<HashMap<_, _>>();
+    let mut servers = HashMap::new();
+    for (name, key) in keys.iter() {
+        servers.insert(name, Rc::new(RefCell::new(dns::DnsServer::new(key.server, &key).await)));
+    }
     let mut iface_states = HashMap::<String, Vec<RecordState>>::new();
     for a in config.a.into_iter() {
         let key = keys.get(&a.key).unwrap();
+        let server = servers.get(&a.key).unwrap();
         iface_states.entry(a.interface.clone())
             .or_insert(vec![])
-            .push(RecordState::new(a, key.clone(), "0.0.0.0/0"));
+            .push(RecordState::new(a, server.clone(), key.clone(), "0.0.0.0/0"));
     }
     for aaaa in config.aaaa.into_iter() {
         let key = keys.get(&aaaa.key).unwrap();
+        let server = servers.get(&aaaa.key).unwrap();
         iface_states.entry(aaaa.interface.clone())
             .or_insert(vec![])
-            .push(RecordState::new(aaaa, key.clone(), "2000::/3"));
+            .push(RecordState::new(aaaa, server.clone(), key.clone(), "2000::/3"));
     }
 
     let mut addr_updates = ifaces::start();
-
-    // dns::query().await?;
-    // dns::update().await?;
 
     loop {
         match timeout(Duration::from_millis(IDLE_TIMEOUT), addr_updates.recv()).await {
@@ -99,11 +140,10 @@ async fn main() -> Result<(), String> {
                 println!("IDLE_TIMEOUT");
 
                 'send_update:
-                for (iface, states) in &mut iface_states {
+                for (_iface, states) in &mut iface_states {
                     for state in states.iter_mut() {
                         if state.dirty {
-                            println!("Update {}: {}", iface, state.addr.unwrap());
-                            state.dirty = false;
+                            state.update().await;
                             break 'send_update;
                         }
                     }

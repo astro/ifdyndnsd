@@ -1,4 +1,4 @@
-use std::net::{Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -14,21 +14,77 @@ use trust_dns_client::proto::error::ProtoResult;
 
 mod tsig;
 
-pub async fn query() -> Result<(), String> {
-    let stream = UdpClientStream::<UdpSocket>::new(([172,22,24,4], 53).into());
-    let client = AsyncClient::connect(stream);
-    let (mut client, bg) = client.await?;
+pub struct DnsServer {
+    client: AsyncClient,
+}
 
-    tokio::spawn(bg);
+impl DnsServer {
+    pub async fn new(addr: IpAddr, key: &crate::config::TsigKey) -> Self {
+        let alg = match key.alg.as_str() {
+            "hmac-sha224" => tsig::Algorithm::HmacSha224,
+            "hmac-sha256" => tsig::Algorithm::HmacSha256,
+            "hmac-sha384" => tsig::Algorithm::HmacSha384,
+            "hmac-sha512" => tsig::Algorithm::HmacSha512,
+            _ => panic!("Invalid TSig algorithm: {}", key.alg)
+        };
+        let signer = Signer {
+            key: tsig::Key::new(
+                Name::from_str(&key.name).unwrap(),
+                alg,
+                key.secret.bytes().collect::<Vec<u8>>()
+            ),
+        };
 
-    let query = client.query(Name::from_str("astro.dyn.spaceboyz.net.")?, DNSClass::IN, RecordType::A);
-    let response = query.await
-        .map_err(|e| format!("{}", e))?;
+        let stream = UdpClientStream::<UdpSocket, Signer>::with_timeout_and_signer(
+            (addr, 53).into(),
+            Duration::from_secs(3),
+            Some(Arc::new(signer)),
+        );
+        let client = AsyncClient::connect(stream);
+        let (mut client, bg) = client.await.unwrap();
+        client.disable_edns();
 
-    // if let &RData::A(addr) = response.answers()[0].rdata() {
-    //     println!("a: {}", addr);
-    // }
-    Ok(())
+        tokio::spawn(bg);
+
+        let mut this = DnsServer { client };
+        this.query("spaceboyz.net", RecordType::AAAA).await.unwrap();
+        this
+    }
+
+    pub async fn query(&mut self, name: &str, record_type: RecordType) -> Result<IpAddr, String> {
+        let query = self.client.query(Name::from_str(name)?, DNSClass::IN, record_type);
+        let response = query.await
+            .map_err(|e| format!("{}", e))?;
+
+        for answer in response.answers() {
+            match answer.rdata() {
+                RData::A(addr) => return Ok(addr.clone().into()),
+                RData::AAAA(addr) => return Ok(addr.clone().into()),
+                _ => {}
+            }
+        }
+
+        Err(format!("No record"))
+    }
+
+    pub async fn update(&mut self, name: &str, addr: IpAddr) -> Result<(), String> {
+        let rdata = match addr {
+            IpAddr::V4(addr) => RData::A(addr),
+            IpAddr::V6(addr) => RData::AAAA(addr),
+        };
+        let rec = Record::from_rdata(Name::from_str(name)?, 0, rdata);
+        let origin = Name::from_str("dyn.spaceboyz.net")?;
+        // let query = self.client.delete_rrset(rec, origin);
+        let query = self.client.append(rec, origin, false);
+        let response = query.await
+            .map_err(|e| format!("{}", e))?;
+
+        if response.response_code() != ResponseCode::NoError {
+            Err(format!("Response code: {}", response.response_code()))?;
+        }
+        println!("res: {:?}", response);
+        Ok(())
+    }
 }
 
 struct Signer {
@@ -43,38 +99,4 @@ impl MessageFinalizer for Signer {
         Ok((vec![record], None))
     }
     
-}
-
-pub async fn update() -> Result<(), String> {
-    let signer = Signer {
-        key: tsig::Key::new(
-            Name::from_str("astro-test.dyn.spaceboyz.net").unwrap(),
-            tsig::Algorithm::HmacSha256,
-            b"secret not as base64".to_vec()
-        ),
-    };
-
-    let stream = UdpClientStream::<UdpSocket, Signer>::with_timeout_and_signer(
-        ([172,22,24,4], 53).into(),
-        Duration::from_secs(3),
-        Some(Arc::new(signer)),
-    );
-    let client = AsyncClient::connect(stream);
-    let (mut client, bg) = client.await?;
-    client.disable_edns();
-
-    tokio::spawn(bg);
-
-    let rec = Record::from_rdata(Name::from_str("test.dyn.spaceboyz.net")?, 0, RData::A(Ipv4Addr::LOCALHOST));
-    let origin = Name::from_str("dyn.spaceboyz.net")?;
-    let query = client.delete_rrset(rec, origin);
-    // let query = client.append(rec, origin, false);
-    let response = query.await
-        .map_err(|e| format!("{}", e))?;
-
-    if response.response_code() != ResponseCode::NoError {
-        Err(format!("Response code: {}", response.response_code()))?;
-    }
-    println!("res: {:?}", response);
-    Ok(())
 }
