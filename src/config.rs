@@ -41,8 +41,8 @@ pub struct Interface {
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub keys: HashMap<String, TsigKey>,
-    pub a: Vec<Interface>,
-    pub aaaa: Vec<Interface>,
+    pub a: Option<Vec<Interface>>,
+    pub aaaa: Option<Vec<Interface>>,
 }
 
 pub fn load(filename: &str) -> Result<Config, String> {

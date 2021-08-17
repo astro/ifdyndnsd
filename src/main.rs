@@ -119,13 +119,13 @@ async fn main() -> Result<(), String> {
         servers.insert(name, Rc::new(RefCell::new(dns::DnsServer::new(key.server, &key).await)));
     }
     let mut iface_states = HashMap::<String, Vec<RecordState>>::new();
-    for a in config.a.into_iter() {
+    for a in config.a.unwrap_or(vec![]).into_iter() {
         let server = servers.get(&a.key).unwrap();
         iface_states.entry(a.interface.clone())
             .or_insert(vec![])
             .push(RecordState::new(a, server.clone(), "0.0.0.0/0"));
     }
-    for aaaa in config.aaaa.into_iter() {
+    for aaaa in config.aaaa.unwrap_or(vec![]).into_iter() {
         let server = servers.get(&aaaa.key).unwrap();
         iface_states.entry(aaaa.interface.clone())
             .or_insert(vec![])
