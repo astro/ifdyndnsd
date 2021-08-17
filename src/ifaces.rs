@@ -82,7 +82,7 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
             match (addr, flags) {
                 (Some(addr), Some(flags)) => {
                     let temp = flags & IFA_F_TEMPORARY != 0;
-                    println!("{}{} {:x?}", name, if temp { " (temp)" } else { "" }, addr);
+                    // println!("{}{} {:x?}", name, if temp { " (temp)" } else { "" }, addr);
                     if !temp {
                         buf_to_addr(addr)
                             .map(|addr| initial.push((name.clone(), addr)));
