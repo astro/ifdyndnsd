@@ -42,20 +42,21 @@ impl DnsServer {
         DnsServer { client }
     }
 
-    pub async fn query(&mut self, name: &str, record_type: RecordType) -> Result<IpAddr, String> {
+    pub async fn query(&mut self, name: &str, record_type: RecordType) -> Result<Vec<IpAddr>, String> {
         let query = self.client.query(Name::from_str(name)?, DNSClass::IN, record_type);
         let response = query.await
             .map_err(|e| format!("{}", e))?;
 
-        for answer in response.answers() {
-            match answer.rdata() {
-                RData::A(addr) => return Ok(addr.clone().into()),
-                RData::AAAA(addr) => return Ok(addr.clone().into()),
-                _ => {}
-            }
-        }
+        let result = response.answers()
+            .iter()
+            .filter_map(|answer| match answer.rdata() {
+                RData::A(addr) => Some(addr.clone().into()),
+                RData::AAAA(addr) => Some(addr.clone().into()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
 
-        Err(format!("No record"))
+        Ok(result)
     }
 
     pub async fn update(&mut self, hostname: &str, addr: IpAddr) -> Result<(), String> {
