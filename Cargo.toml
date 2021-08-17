@@ -1,5 +1,5 @@
 [package]
-name = "dyndns6d"
+name = "ifdyndnsd"
 version = "0.1.0"
 authors = ["Astro <astro@spaceboyz.net>"]
 edition = "2018"
