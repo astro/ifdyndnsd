@@ -1,15 +1,12 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::IpAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use tokio::net::{TcpSocket, UdpSocket};
-use trust_dns_client::tcp::TcpClientStream;
+use tokio::net::UdpSocket;
 use trust_dns_client::udp::UdpClientStream;
-use trust_dns_client::client::{Client, AsyncClient, ClientHandle};
+use trust_dns_client::client::{AsyncClient, ClientHandle};
 use trust_dns_client::rr::{DNSClass, Name, RData, Record, RecordType};
 use trust_dns_client::op::{Message, MessageFinalizer, MessageVerifier, ResponseCode};
-use trust_dns_client::rr::dnssec::{Algorithm, KeyPair};
-use trust_dns_client::rr::rdata::key::{KeyUsage, KEY};
 use trust_dns_client::proto::error::ProtoResult;
 
 mod tsig;
@@ -20,13 +17,9 @@ pub struct DnsServer {
 
 impl DnsServer {
     pub async fn new(addr: IpAddr, key: &crate::config::TsigKey) -> Self {
-        let alg = match key.alg.as_str() {
-            "hmac-sha224" => tsig::Algorithm::HmacSha224,
-            "hmac-sha256" => tsig::Algorithm::HmacSha256,
-            "hmac-sha384" => tsig::Algorithm::HmacSha384,
-            "hmac-sha512" => tsig::Algorithm::HmacSha512,
-            _ => panic!("Invalid TSig algorithm: {}", key.alg)
-        };
+        let alg = tsig::Algorithm::from_name(
+            &Name::from_ascii(&key.alg).unwrap()
+        ).unwrap();
         let signer = Signer {
             key: tsig::Key::new(
                 Name::from_str(&key.name).unwrap(),
@@ -46,9 +39,7 @@ impl DnsServer {
 
         tokio::spawn(bg);
 
-        let mut this = DnsServer { client };
-        this.query("spaceboyz.net", RecordType::AAAA).await.unwrap();
-        this
+        DnsServer { client }
     }
 
     pub async fn query(&mut self, name: &str, record_type: RecordType) -> Result<IpAddr, String> {
@@ -92,8 +83,7 @@ struct Signer {
 }
 
 impl MessageFinalizer for Signer {
-    fn finalize_message(&self, message: &Message, current_time: u32) -> ProtoResult<(Vec<Record>, Option<MessageVerifier>)> {
-        println!("finalize {:?}", message);
+    fn finalize_message(&self, message: &Message, _current_time: u32) -> ProtoResult<(Vec<Record>, Option<MessageVerifier>)> {
         let unix_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
         let record = tsig::create_signature(&message, unix_time.as_secs(), &self.key).unwrap();
         Ok((vec![record], None))

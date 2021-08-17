@@ -4,7 +4,6 @@
 use std::{
     convert::{TryFrom, TryInto},
     fmt,
-    time::{SystemTime, SystemTimeError},
 };
 
 use hmac::crypto_mac::InvalidKeyLength;
@@ -21,7 +20,6 @@ use trust_dns_client::{
 pub enum Error {
     Proto(ProtoError),
     InvalidKeyLength(InvalidKeyLength),
-    SystemTime(SystemTimeError),
 }
 
 impl fmt::Display for Error {
@@ -29,7 +27,6 @@ impl fmt::Display for Error {
         match self {
             Error::Proto(e) => write!(f, "{}", e),
             Error::InvalidKeyLength(e) => write!(f, "{}", e),
-            Error::SystemTime(e) => write!(f, "{}", e),
         }
     }
 }
@@ -45,12 +42,6 @@ impl From<ProtoError> for Error {
 impl From<InvalidKeyLength> for Error {
     fn from(e: InvalidKeyLength) -> Self {
         Error::InvalidKeyLength(e)
-    }
-}
-
-impl From<SystemTimeError> for Error {
-    fn from(e: SystemTimeError) -> Self {
-        Error::SystemTime(e)
     }
 }
 
@@ -134,13 +125,6 @@ impl Key {
             secret: secret.into(),
         }
     }
-}
-
-pub fn add_signature(msg: &mut op::Message, key: &Key) -> Result<(), Error> {
-    let unix_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
-    let record = create_signature(&msg, unix_time.as_secs(), key)?;
-    msg.add_additional(record);
-    Ok(())
 }
 
 pub fn create_signature(msg: &op::Message, time_signed: u64, key: &Key) -> Result<rr::Record, Error> {

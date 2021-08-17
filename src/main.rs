@@ -3,8 +3,8 @@ mod ifaces;
 mod dns;
 
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::collections::HashMap;
+use std::net::IpAddr;
 use std::rc::Rc;
 use std::str::FromStr;
 use std::time::Duration;
@@ -14,7 +14,6 @@ use trust_dns_client::rr::RecordType;
 
 struct RecordState {
     server: Rc<RefCell<dns::DnsServer>>,
-    key: Rc<config::TsigKey>,
     hostname: String,
 
     addr: Option<IpAddr>,
@@ -23,10 +22,9 @@ struct RecordState {
 }
 
 impl RecordState {
-    fn new(iface: config::Interface, server: Rc<RefCell<dns::DnsServer>>, key: Rc<config::TsigKey>, default_scope: &str) -> Self {
+    fn new(iface: config::Interface, server: Rc<RefCell<dns::DnsServer>>, default_scope: &str) -> Self {
         RecordState {
             server,
-            key,
             hostname: iface.name.clone(),
 
             addr: None,
@@ -80,7 +78,7 @@ impl RecordState {
         }
 
         server.update(&self.hostname, self.addr.unwrap()).await
-            .map_err(|e| println!("{}", e));
+            .unwrap_or_else(|e| println!("{}", e));
     }
 }
 
@@ -95,7 +93,6 @@ async fn main() -> Result<(), String> {
     }
     let config_file = &args[1];
     let config = config::load(config_file)?;
-    println!("{:?}", config);
 
     let keys = config.keys.into_iter()
         .map(|(name, key)| (name, Rc::new(key)))
@@ -106,18 +103,16 @@ async fn main() -> Result<(), String> {
     }
     let mut iface_states = HashMap::<String, Vec<RecordState>>::new();
     for a in config.a.into_iter() {
-        let key = keys.get(&a.key).unwrap();
         let server = servers.get(&a.key).unwrap();
         iface_states.entry(a.interface.clone())
             .or_insert(vec![])
-            .push(RecordState::new(a, server.clone(), key.clone(), "0.0.0.0/0"));
+            .push(RecordState::new(a, server.clone(), "0.0.0.0/0"));
     }
     for aaaa in config.aaaa.into_iter() {
-        let key = keys.get(&aaaa.key).unwrap();
         let server = servers.get(&aaaa.key).unwrap();
         iface_states.entry(aaaa.interface.clone())
             .or_insert(vec![])
-            .push(RecordState::new(aaaa, server.clone(), key.clone(), "2000::/3"));
+            .push(RecordState::new(aaaa, server.clone(), "2000::/3"));
     }
 
     let mut addr_updates = ifaces::start();
@@ -137,7 +132,6 @@ async fn main() -> Result<(), String> {
                 return Ok(()),
             Err(_) => {
                 /* IDLE_TIMEOUT reached */
-                println!("IDLE_TIMEOUT");
 
                 'send_update:
                 for (_iface, states) in &mut iface_states {
