@@ -1,7 +1,7 @@
 use std::net::IpAddr;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 use tokio::net::UdpSocket;
 use trust_dns_client::udp::UdpClientStream;
 use trust_dns_client::client::{AsyncClient, ClientHandle};
@@ -91,9 +91,8 @@ struct Signer {
 }
 
 impl MessageFinalizer for Signer {
-    fn finalize_message(&self, message: &Message, _current_time: u32) -> ProtoResult<(Vec<Record>, Option<MessageVerifier>)> {
-        let unix_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
-        let record = tsig::create_signature(&message, unix_time.as_secs(), &self.key).unwrap();
+    fn finalize_message(&self, message: &Message, current_time: u32) -> ProtoResult<(Vec<Record>, Option<MessageVerifier>)> {
+        let record = tsig::create_signature(&message, current_time.into(), &self.key).unwrap();
         Ok((vec![record], None))
     }
     
