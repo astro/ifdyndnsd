@@ -9,12 +9,24 @@ pub struct TsigKey {
     pub server: IpAddr,
     pub name: String,
     pub alg: String,
-    pub secret: String,
-    // TODO:
-    // #[serde(rename = "secret-base64")]
-    // pub secret_base64: Option<String>,
-    // #[serde(rename = "secret-file")]
-    // pub secret_file: Option<String>,
+    pub secret: Option<String>,
+    #[serde(rename = "secret-base64")]
+    pub secret_base64: Option<String>,
+}
+
+impl TsigKey {
+    pub fn get_secret(&self) -> Vec<u8> {
+        match (&self.secret, &self.secret_base64) {
+            (Some(_), Some(_)) =>
+                panic!("Both secret and secret_base64 configured for key {}", self.name),
+            (None, None) =>
+                panic!("No secret or secret_base64 configured for key {}", self.name),
+            (Some(secret), _) =>
+                secret.bytes().collect::<Vec<u8>>(),
+            (_, Some(secret_base64)) =>
+                base64::decode(secret_base64).unwrap()
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]

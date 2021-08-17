@@ -24,7 +24,7 @@ impl DnsServer {
             key: tsig::Key::new(
                 Name::from_str(&key.name).unwrap(),
                 alg,
-                key.secret.bytes().collect::<Vec<u8>>()
+                key.get_secret()
             ),
         };
 
