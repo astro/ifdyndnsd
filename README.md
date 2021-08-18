@@ -14,7 +14,8 @@ cargo run config.toml
 ## Configuration
 
 ```toml
-# Define a key which can be referenced by "mykey"
+# Define a key which can be referenced by "mykey". These keys are
+# usually generated with BIND's `ddns-confgen`.
 [keys.mykey]
 # IP address of the DNS server
 # (sorry, can't resolve this yet)
