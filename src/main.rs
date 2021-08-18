@@ -208,7 +208,8 @@ async fn main() -> Result<(), String> {
                 }
             }
             Ok(None) =>
-                return Ok(()),
+                // netlink closed?
+                return Err("finished".to_string()),
             Err(_) => {
                 /* IDLE_TIMEOUT reached */
                 interval = NEVER_TIMEOUT;
