@@ -7,35 +7,41 @@ use std::collections::HashMap;
 use std::net::{IpAddr, Ipv6Addr};
 use std::rc::Rc;
 use std::str::FromStr;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 use cidr::IpCidr;
 use tokio::time::timeout;
 use trust_dns_client::rr::RecordType;
 
 struct RecordState {
     server: Rc<RefCell<dns::DnsServer>>,
-    hostname: String,
-    neighbors: HashMap<String, Ipv6Addr>,
+    hostname: Rc<String>,
+    neighbors: Rc<HashMap<String, Ipv6Addr>>,
 
     addr: Option<IpAddr>,
     scope: IpCidr,
     dirty: bool,
+    update_tried: Option<SystemTime>,
 }
 
 impl RecordState {
     fn new(iface: config::Interface, server: Rc<RefCell<dns::DnsServer>>, default_scope: &str) -> Self {
         RecordState {
             server,
-            hostname: iface.name.clone(),
-            neighbors: iface.neighbors
-                .unwrap_or_else(|| HashMap::new()),
+            hostname: Rc::new(iface.name.clone()),
+            // TODO: bail on ipv4
+            neighbors: Rc::new(
+                iface.neighbors
+                    .unwrap_or_default()
+            ),
 
             addr: None,
+            // TODO: check af
             scope: IpCidr::from_str(match &iface.scope {
                 Some(s) => s,
                 None => default_scope,
             }).unwrap(),
             dirty: false,
+            update_tried: None,
         }
     }
 
@@ -52,50 +58,76 @@ impl RecordState {
 
         self.addr = Some(addr);
         self.dirty = true;
+        self.update_tried = None;
     }
 
-    async fn update(&mut self) {
+    pub fn can_update(&self) -> bool {
+        const RETRY_INTERVAL: Duration = Duration::from_secs(60);
+
+        match self.update_tried {
+            // nothing to do
+            _ if !self.dirty => false,
+
+            // new
+            None => true,
+
+            // retry if RETRY_INTERVAL elapsed
+            Some(update_tried) => SystemTime::now() >= update_tried + RETRY_INTERVAL,
+        }
+    }
+
+    pub async fn update(&mut self) {
         self.dirty = false;
+        self.update_tried = Some(SystemTime::now());
 
-        let record_type;
-        match self.addr {
-            None => return,
-            Some(IpAddr::V4(_)) =>
-                record_type = RecordType::A,
-            Some(IpAddr::V6(_)) =>
-                record_type = RecordType::AAAA,
-        };
-
-        let mut server = self.server.borrow_mut();
-        match server.query(&self.hostname, record_type).await {
-            Ok(addrs) if addrs.len() == 1 && Some(addrs[0]) == self.addr => {
-                println!("No address change for {}", self.hostname);
-                return;
-            }
-            Ok(addr) => {
-                println!("Outdated address for {}: {:?}", self.hostname, addr);
-            }
-            Err(e) => {
-                println!("Error querying for {} {}: {}", record_type, self.hostname, e);
-            }
+        let addr = self.addr.unwrap();
+        if let Err(e) = self.update_addr(&self.hostname.clone(), &addr).await {
+            println!("Error updating {} to {}: {}", self.hostname, self.addr.unwrap(), e);
+            // try again later
+            self.dirty = true;
+            return;
         }
 
-        server.update(&self.hostname, self.addr.unwrap()).await
-            .unwrap_or_else(|e| println!("{}", e));
-
         if let Some(IpAddr::V6(addr)) = self.addr {
-            for (neighbor_name, neighbor_addr) in self.neighbors.iter() {
+            for (neighbor_name, neighbor_addr) in self.neighbors.clone().iter() {
                 let net_segs = addr.segments();
                 let host_segs = neighbor_addr.segments();
                 let addr = Ipv6Addr::new(
                     net_segs[0], net_segs[1], net_segs[2], net_segs[3],
                     host_segs[4], host_segs[5], host_segs[6], host_segs[7],
-                );
+                ).into();
 
-                server.update(neighbor_name, addr.into()).await
-                    .unwrap_or_else(|e| println!("{}", e));
+                if let Err(e) = self.update_addr(neighbor_name, &addr).await {
+                    println!("Error updating neighbor {} to {}: {}", neighbor_addr, addr, e);
+                }
             }
         }
+    }
+
+    async fn update_addr(&mut self, name: &str, addr: &IpAddr) -> Result<(), String> {
+        let record_type;
+        match addr {
+            IpAddr::V4(_) =>
+                record_type = RecordType::A,
+            IpAddr::V6(_) =>
+                record_type = RecordType::AAAA,
+        };
+
+        let mut server = self.server.borrow_mut();
+        match server.query(name, record_type).await {
+            Ok(addrs) if addrs.len() == 1 && Some(addrs[0]) == self.addr => {
+                println!("No address change for {}", name);
+                return Ok(());
+            }
+            Ok(addr) => {
+                println!("Outdated address for {}: {:?}", name, addr);
+            }
+            Err(e) => {
+                println!("Error querying for {} {}: {}", record_type, name, e);
+            }
+        }
+
+        server.update(name, *addr).await
     }
 }
 
@@ -135,6 +167,7 @@ async fn main() -> Result<(), String> {
     let mut addr_updates = ifaces::start();
 
     loop {
+        // TODO: timeout only if anything dirty
         match timeout(Duration::from_millis(IDLE_TIMEOUT), addr_updates.recv()).await {
             Ok(Some((iface, addr))) => {
                 println!("{}: {}", iface, addr);
@@ -152,7 +185,7 @@ async fn main() -> Result<(), String> {
                 'send_update:
                 for states in iface_states.values_mut() {
                     for state in states.iter_mut() {
-                        if state.dirty {
+                        if state.can_update() {
                             state.update().await;
                             break 'send_update;
                         }
