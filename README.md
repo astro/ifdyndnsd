@@ -24,8 +24,8 @@ server = "192.0.2.53"
 name = "mykey.example.com"
 # Algorithm to use for TSIG
 alg = "hmac-sha256"
-# Plain-text secret; exclusive with `secret-base64`
-secret = "topsecret\n"
+# # Plain-text secret; exclusive with `secret-base64`
+# secret = "topsecret\n"
 # Secret encoded in base64 just like BIND uses. This allows using
 # binary strings.
 secret-base64 = "dG9wc2VjcmV0Cg=="
@@ -61,7 +61,7 @@ scope = "2000::/3"
 [[aaaa]]
 key = "mykey"
 # For IPv6 ifdyndnsd doesn't need to run on the LAN gateway.
-name = "router.home.example.net"
+name = "server.home.example.net"
 # Watch the local LAN interface for addresses
 interface = "eth0"
 # Default `scope = "2000::/3"` should be right in most DynDNS
@@ -71,7 +71,7 @@ interface = "eth0"
 # records for other hosts in your LAN if you know the last 64 bits of
 # their radvd-assigned addresses (the host part in a /64 network). Be
 # careful not to use /temporary/ addresses (Privacy Extensions) here:
-neighbors."server.example.net" = "::2de:adff:fe00:beef"
+neighbors."router.example.net" = "::2de:adff:fe00:beef"
 neighbors."laptop.example.net" = "::2de:caff:fefb:ad00"
 neighbors."phone.example.net" = "::212:23ff:fe56:789a"
 
