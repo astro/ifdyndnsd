@@ -12,6 +12,12 @@ use cidr::IpCidr;
 use tokio::time::timeout;
 use trust_dns_client::rr::RecordType;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AddressFamily {
+    IPv4,
+    IPv6,
+}
+
 struct RecordState {
     server: Rc<RefCell<dns::DnsServer>>,
     hostname: Rc<String>,
@@ -24,22 +30,32 @@ struct RecordState {
 }
 
 impl RecordState {
-    fn new(iface: config::Interface, server: Rc<RefCell<dns::DnsServer>>, default_scope: &str) -> Self {
+    fn new(iface: config::Interface, server: Rc<RefCell<dns::DnsServer>>, af: AddressFamily) -> Self {
+        let scope = IpCidr::from_str(
+            iface.scope.as_ref().map(|s| s.as_str())
+                .unwrap_or_else(|| match af {
+                    AddressFamily::IPv4 => "0.0.0.0/0",
+                    AddressFamily::IPv6 => "2000::/3",
+                })
+        ).unwrap();
+        match af {
+            AddressFamily::IPv4 if iface.neighbors.is_some() =>
+                panic!("neighbors are not supported on IPv4"),
+            AddressFamily::IPv4 if scope.is_ipv4() => {}
+            AddressFamily::IPv6 if scope.is_ipv6() => {}
+            _ => panic!("scope {} doesn't match address family {:?}", scope, af),
+        }
+
         RecordState {
             server,
             hostname: Rc::new(iface.name.clone()),
-            // TODO: bail on ipv4
             neighbors: Rc::new(
                 iface.neighbors
                     .unwrap_or_default()
             ),
 
             addr: None,
-            // TODO: check af
-            scope: IpCidr::from_str(match &iface.scope {
-                Some(s) => s,
-                None => default_scope,
-            }).unwrap(),
+            scope,
             dirty: false,
             update_tried: None,
         }
@@ -155,13 +171,13 @@ async fn main() -> Result<(), String> {
         let server = servers.get(&a.key).unwrap();
         iface_states.entry(a.interface.clone())
             .or_insert_with(Vec::new)
-            .push(RecordState::new(a, server.clone(), "0.0.0.0/0"));
+            .push(RecordState::new(a, server.clone(), AddressFamily::IPv4));
     }
     for aaaa in config.aaaa.unwrap_or_default().into_iter() {
         let server = servers.get(&aaaa.key).unwrap();
         iface_states.entry(aaaa.interface.clone())
             .or_insert_with(Vec::new)
-            .push(RecordState::new(aaaa, server.clone(), "2000::/3"));
+            .push(RecordState::new(aaaa, server.clone(), AddressFamily::IPv6));
     }
 
     let mut addr_updates = ifaces::start();
