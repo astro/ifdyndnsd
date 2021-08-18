@@ -142,7 +142,7 @@ impl RecordState {
 
         let mut server = self.server.borrow_mut();
         match server.query(name, record_type).await {
-            Ok(addrs) if addrs.len() == 1 && Some(addrs[0]) == self.addr => {
+            Ok(addrs) if addrs.len() == 1 && addrs[0] == *addr => {
                 println!("No address change for {}", name);
                 return Ok(());
             }
