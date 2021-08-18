@@ -34,7 +34,7 @@ struct RecordState {
 impl RecordState {
     fn new(iface: config::Interface, server: Rc<RefCell<dns::DnsServer>>, af: AddressFamily) -> Self {
         let scope = IpCidr::from_str(
-            iface.scope.as_ref().map(|s| s.as_str())
+            iface.scope.as_deref()
                 .unwrap_or_else(|| match af {
                     AddressFamily::IPv4 => "0.0.0.0/0",
                     AddressFamily::IPv6 => "2000::/3",
@@ -198,7 +198,6 @@ async fn main() -> Result<(), String> {
     loop {
         match timeout(interval, addr_updates.recv()).await {
             Ok(Some((iface, addr))) => {
-                println!("{}: {}", iface, addr);
                 if let Some(states) = iface_states.get_mut(&iface) {
                     for record_state in states.iter_mut() {
                         if record_state.set_address(addr) {
