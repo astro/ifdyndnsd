@@ -7,10 +7,12 @@ use std::collections::HashMap;
 use std::net::{IpAddr, Ipv6Addr};
 use std::rc::Rc;
 use std::str::FromStr;
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, Instant};
 use cidr::IpCidr;
 use tokio::time::timeout;
 use trust_dns_client::rr::RecordType;
+
+const RETRY_INTERVAL: u64 = 60;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum AddressFamily {
@@ -26,7 +28,7 @@ struct RecordState {
     addr: Option<IpAddr>,
     scope: IpCidr,
     dirty: bool,
-    update_tried: Option<SystemTime>,
+    update_tried: Option<Instant>,
 }
 
 impl RecordState {
@@ -61,25 +63,24 @@ impl RecordState {
         }
     }
 
-    fn set_address(&mut self, addr: IpAddr) {
+    fn set_address(&mut self, addr: IpAddr) -> bool {
         // check scope
         if ! self.scope.contains(&addr) {
-            return;
+            return false;
         }
 
         if self.addr == Some(addr) {
             // No change
-            return;
+            return false;
         }
 
         self.addr = Some(addr);
         self.dirty = true;
         self.update_tried = None;
+        true
     }
 
     pub fn can_update(&self) -> bool {
-        const RETRY_INTERVAL: Duration = Duration::from_secs(60);
-
         match self.update_tried {
             // nothing to do
             _ if !self.dirty => false,
@@ -88,13 +89,23 @@ impl RecordState {
             None => true,
 
             // retry if RETRY_INTERVAL elapsed
-            Some(update_tried) => SystemTime::now() >= update_tried + RETRY_INTERVAL,
+            Some(update_tried) => Instant::now() >= update_tried + Duration::from_secs(RETRY_INTERVAL),
+        }
+    }
+
+    pub fn next_timeout(&self) -> Option<Instant> {
+        if self.dirty {
+            self.update_tried.map(
+                |update_tried| update_tried + Duration::from_secs(RETRY_INTERVAL)
+            )
+        } else {
+            None
         }
     }
 
     pub async fn update(&mut self) {
         self.dirty = false;
-        self.update_tried = Some(SystemTime::now());
+        self.update_tried = Some(Instant::now());
 
         let addr = self.addr.unwrap();
         if let Err(e) = self.update_addr(&self.hostname.clone(), &addr).await {
@@ -147,8 +158,6 @@ impl RecordState {
     }
 }
 
-const IDLE_TIMEOUT: u64 = 1000;
-
 #[tokio::main]
 async fn main() -> Result<(), String> {
     let args = std::env::args().collect::<Vec<_>>();
@@ -180,16 +189,21 @@ async fn main() -> Result<(), String> {
             .push(RecordState::new(aaaa, server.clone(), AddressFamily::IPv6));
     }
 
+    const IDLE_TIMEOUT: Duration = Duration::from_secs(1);
+    const NEVER_TIMEOUT: Duration = Duration::from_secs(365 * 86400);
+    let mut interval = NEVER_TIMEOUT;
+
     let mut addr_updates = ifaces::start();
 
     loop {
-        // TODO: timeout only if anything dirty
-        match timeout(Duration::from_millis(IDLE_TIMEOUT), addr_updates.recv()).await {
+        match timeout(interval, addr_updates.recv()).await {
             Ok(Some((iface, addr))) => {
                 println!("{}: {}", iface, addr);
                 if let Some(states) = iface_states.get_mut(&iface) {
                     for record_state in states.iter_mut() {
-                        record_state.set_address(addr);
+                        if record_state.set_address(addr) {
+                            interval = IDLE_TIMEOUT;
+                        }
                     }
                 }
             }
@@ -197,6 +211,7 @@ async fn main() -> Result<(), String> {
                 return Ok(()),
             Err(_) => {
                 /* IDLE_TIMEOUT reached */
+                interval = NEVER_TIMEOUT;
 
                 'send_update:
                 for states in iface_states.values_mut() {
@@ -204,6 +219,18 @@ async fn main() -> Result<(), String> {
                         if state.can_update() {
                             state.update().await;
                             break 'send_update;
+                        }
+                    }
+                }
+
+                /* if NEVER_TIMEOUT was set, find a smaller timeout to retry an update */
+                for states in iface_states.values() {
+                    for state in states.iter() {
+                        if let Some(state_timeout) = state.next_timeout() {
+                            let state_interval = Instant::now() - state_timeout;
+                            if state_interval < interval {
+                                interval = state_interval;
+                            }
                         }
                     }
                 }
