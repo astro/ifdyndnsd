@@ -119,16 +119,16 @@ async fn main() -> Result<(), String> {
         servers.insert(name, Rc::new(RefCell::new(dns::DnsServer::new(key.server, &key).await)));
     }
     let mut iface_states = HashMap::<String, Vec<RecordState>>::new();
-    for a in config.a.unwrap_or(vec![]).into_iter() {
+    for a in config.a.unwrap_or_default().into_iter() {
         let server = servers.get(&a.key).unwrap();
         iface_states.entry(a.interface.clone())
-            .or_insert(vec![])
+            .or_insert_with(Vec::new)
             .push(RecordState::new(a, server.clone(), "0.0.0.0/0"));
     }
-    for aaaa in config.aaaa.unwrap_or(vec![]).into_iter() {
+    for aaaa in config.aaaa.unwrap_or_default().into_iter() {
         let server = servers.get(&aaaa.key).unwrap();
         iface_states.entry(aaaa.interface.clone())
-            .or_insert(vec![])
+            .or_insert_with(Vec::new)
             .push(RecordState::new(aaaa, server.clone(), "2000::/3"));
     }
 
@@ -138,12 +138,11 @@ async fn main() -> Result<(), String> {
         match timeout(Duration::from_millis(IDLE_TIMEOUT), addr_updates.recv()).await {
             Ok(Some((iface, addr))) => {
                 println!("{}: {}", iface, addr);
-                iface_states.get_mut(&iface)
-                    .map(|states| {
-                        for record_state in states.iter_mut() {
-                            record_state.set_address(addr);
-                        }
-                    });
+                if let Some(states) = iface_states.get_mut(&iface) {
+                    for record_state in states.iter_mut() {
+                        record_state.set_address(addr);
+                    }
+                }
             }
             Ok(None) =>
                 return Ok(()),
@@ -151,7 +150,7 @@ async fn main() -> Result<(), String> {
                 /* IDLE_TIMEOUT reached */
 
                 'send_update:
-                for (_iface, states) in &mut iface_states {
+                for states in iface_states.values_mut() {
                     for state in states.iter_mut() {
                         if state.dirty {
                             state.update().await;

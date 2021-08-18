@@ -72,7 +72,7 @@ impl DnsServer {
             .map_err(|e| format!("{}", e))?;
 
         if response.response_code() != ResponseCode::NoError {
-            Err(format!("Response code: {}", response.response_code()))?;
+            return Err(format!("Response code: {}", response.response_code()));
         }
         let query = self.client.append(rec, origin, false);
         println!("DNS update: {} {}", hostname, addr);
@@ -80,7 +80,7 @@ impl DnsServer {
             .map_err(|e| format!("{}", e))?;
 
         if response.response_code() != ResponseCode::NoError {
-            Err(format!("Response code: {}", response.response_code()))?;
+            return Err(format!("Response code: {}", response.response_code()));
         }
         Ok(())
     }

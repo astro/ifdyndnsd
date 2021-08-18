@@ -79,16 +79,13 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
                     _ => {}
                 }
             }
-            match (addr, flags) {
-                (Some(addr), Some(flags)) => {
-                    let temp = flags & IFA_F_TEMPORARY != 0;
-                    // println!("{}{} {:x?}", name, if temp { " (temp)" } else { "" }, addr);
-                    if !temp {
-                        buf_to_addr(addr)
-                            .map(|addr| initial.push((name.clone(), addr)));
+            if let (Some(addr), Some(flags)) = (addr, flags) {
+                let temp = flags & IFA_F_TEMPORARY != 0;
+                if !temp {
+                    if let Some(addr) = buf_to_addr(addr) {
+                        initial.push((name.clone(), addr));
                     }
                 }
-                _ => {}
             }
         }
         
@@ -124,16 +121,13 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
                             _ => {}
                         }
                     }
-                    match (addr_buf, flags) {
-                        (Some(addr_buf), Some(flags)) => {
-                            let temp = flags & IFA_F_TEMPORARY != 0;
-                            if !temp {
-                                if let Some(addr) = buf_to_addr(addr_buf) {
-                                    tx.send((name.clone(), addr)).await.unwrap();
-                                }
+                    if let (Some(addr_buf), Some(flags)) = (addr_buf, flags) {
+                        let temp = flags & IFA_F_TEMPORARY != 0;
+                        if !temp {
+                            if let Some(addr) = buf_to_addr(addr_buf) {
+                                tx.send((name.clone(), addr)).await.unwrap();
                             }
                         }
-                        _ => {}
                     }
                 } else {
                     println!("No such link with index={}", m.header.index);
