@@ -227,9 +227,14 @@ async fn main() -> Result<(), String> {
                 for states in iface_states.values() {
                     for state in states.iter() {
                         if let Some(state_timeout) = state.next_timeout() {
-                            let state_interval = Instant::now() - state_timeout;
-                            if state_interval < interval {
-                                interval = state_interval;
+                            let now = Instant::now();
+                            if state_timeout <= now {
+                                interval = Duration::ZERO;
+                            } else {
+                                let state_interval = now - state_timeout;
+                                if state_interval < interval {
+                                    interval = state_interval;
+                                }
                             }
                         }
                     }
