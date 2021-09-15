@@ -83,6 +83,7 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
                 let temp = flags & IFA_F_TEMPORARY != 0;
                 if !temp {
                     if let Some(addr) = buf_to_addr(addr) {
+                        println!("{} initial: {:?}", name, addr);
                         initial.push((name.clone(), addr));
                     }
                 }
@@ -125,6 +126,7 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
                         let temp = flags & IFA_F_TEMPORARY != 0;
                         if !temp {
                             if let Some(addr) = buf_to_addr(addr_buf) {
+                                println!("{} new: {:?}", name, addr);
                                 tx.send((name.clone(), addr)).await.unwrap();
                             }
                         }

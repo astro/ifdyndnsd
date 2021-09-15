@@ -143,11 +143,11 @@ impl RecordState {
         let mut server = self.server.borrow_mut();
         match server.query(name, record_type).await {
             Ok(addrs) if addrs.len() == 1 && addrs[0] == *addr => {
-                println!("No address change for {}", name);
+                println!("No address change for {} ({} == {:?})", name, addr, addrs);
                 return Ok(());
             }
-            Ok(addr) => {
-                println!("Outdated address for {}: {:?}", name, addr);
+            Ok(addrs) => {
+                println!("Outdated address for {}: {:?}", name, addrs);
             }
             Err(e) => {
                 println!("Error querying for {} {}: {}", record_type, name, e);
