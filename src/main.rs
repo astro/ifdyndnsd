@@ -229,7 +229,7 @@ async fn main() -> Result<(), String> {
                         if let Some(state_timeout) = state.next_timeout() {
                             let now = Instant::now();
                             if state_timeout <= now {
-                                interval = Duration::ZERO;
+                                interval = Duration::from_secs(0);
                             } else {
                                 let state_interval = now - state_timeout;
                                 if state_interval < interval {
