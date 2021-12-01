@@ -1,5 +1,5 @@
 { self }:
-{ system, config, lib, ... }:
+{ pkgs, config, lib, ... }:
 
 {
   options.services.ifdyndnsd = with lib; {
@@ -12,7 +12,7 @@
     };
     package = mkOption {
       type = types.package;
-      default = self.packages.${system}.ifdyndnsd;
+      default = self.packages.${pkgs.system}.ifdyndnsd;
     };
     user = mkOption {
       type = types.str;
