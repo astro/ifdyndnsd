@@ -97,7 +97,7 @@ impl RecordState {
         if self.dirty {
             self.update_tried.map(
                 |update_tried| update_tried + Duration::from_secs(RETRY_INTERVAL)
-            )
+            ).or_else(|| Some(Instant::now()))
         } else {
             None
         }
