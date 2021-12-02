@@ -1,9 +1,13 @@
 [package]
 name = "ifdyndnsd"
+description = "Watch netlink for interface address updates to do DynDNS just like nsupdate does"
 version = "0.1.0"
 authors = ["Astro <astro@spaceboyz.net>"]
 edition = "2018"
 license = "GPL-3.0-or-later"
+homepage = "https://github.com/astro/ifdyndnsd"
+repository = "https://github.com/astro/ifdyndnsd.git"
+documentation = "https://docs.rs/ifdyndnsd"
 
 [dependencies]
 futures = "0.3"
