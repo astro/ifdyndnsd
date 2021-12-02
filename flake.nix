@@ -12,8 +12,8 @@
       mozilla = pkgs.callPackage (mozillapkgs + "/package-set.nix") {};
       rust = (mozilla.rustChannelOf {
         channel = "stable";
-        date = "2021-10-04";
-        sha256 = "0swglfa63i14fpgg98agx4b5sz0nckn6phacfy3k6imknsiv8mrg";
+        date = "2021-11-01";
+        sha256 = "1038ss84i5pf4zrgbgm3lyi5mvkycbm7fzd94ribf8ymagl8g71h";
       }).rust;
 
       # Override the version used in naersk
