@@ -109,7 +109,7 @@ impl RecordState {
 
         let addr = self.addr.unwrap();
         if let Err(e) = self.update_addr(&self.hostname.clone(), &addr).await {
-            println!("Error updating {} to {}: {}", self.hostname, self.addr.unwrap(), e);
+            eprintln!("Error updating {} to {}: {}", self.hostname, self.addr.unwrap(), e);
             // try again later
             self.dirty = true;
             return;
@@ -125,7 +125,7 @@ impl RecordState {
                 ).into();
 
                 if let Err(e) = self.update_addr(neighbor_name, &addr).await {
-                    println!("Error updating neighbor {} to {}: {}", neighbor_addr, addr, e);
+                    eprintln!("Error updating neighbor {} to {}: {}", neighbor_addr, addr, e);
                 }
             }
         }
@@ -150,7 +150,7 @@ impl RecordState {
                 println!("Outdated address for {}: {:?}", name, addrs);
             }
             Err(e) => {
-                println!("Error querying for {} {}: {}", record_type, name, e);
+                eprintln!("Error querying for {} {}: {}", record_type, name, e);
             }
         }
 
@@ -162,7 +162,7 @@ impl RecordState {
 async fn main() -> Result<(), String> {
     let args = std::env::args().collect::<Vec<_>>();
     if args.len() != 2 {
-        println!("Usage: {} <config.toml>", args[0]);
+        eprintln!("Usage: {} <config.toml>", args[0]);
         std::process::exit(1);
     }
     let config_file = &args[1];

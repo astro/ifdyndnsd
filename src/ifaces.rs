@@ -28,8 +28,8 @@ pub fn start() -> Receiver<(String, IpAddr)> {
     spawn(async move {
         loop {
             match run(&mut tx).await {
-                Ok(()) => println!("nfnetlink: restarting listener"),
-                Err(e) => println!("nfnetlink error: {}", e),
+                Ok(()) => eprintln!("nfnetlink: restarting listener"),
+                Err(e) => eprintln!("nfnetlink error: {}", e),
             }
         }
     });
@@ -58,7 +58,6 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
     links.try_for_each(|m| {
         let index = m.header.index;
         if let Some(name) = link_message_name(&m) {
-            // println!("{} - {:x?}", name, m);
             interface_names.insert(index, name.to_owned());
         }
         ok(())
@@ -83,7 +82,6 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
                 let temp = flags & IFA_F_TEMPORARY != 0;
                 if !temp {
                     if let Some(addr) = buf_to_addr(addr) {
-                        println!("{} initial: {:?}", name, addr);
                         initial.push((name.clone(), addr));
                     }
                 }
@@ -126,13 +124,12 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
                         let temp = flags & IFA_F_TEMPORARY != 0;
                         if !temp {
                             if let Some(addr) = buf_to_addr(addr_buf) {
-                                println!("{} new: {:?}", name, addr);
                                 tx.send((name.clone(), addr)).await.unwrap();
                             }
                         }
                     }
                 } else {
-                    println!("No such link with index={}", m.header.index);
+                    eprintln!("No such link with index={}", m.header.index);
                 }
             }
             _ => {
