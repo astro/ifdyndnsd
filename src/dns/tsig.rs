@@ -125,16 +125,16 @@ impl Key {
     }
 }
 
-pub fn create_signature(msg: &op::Message, time_signed: u64, key: &Key) -> Result<rr::Record, Error> {
+pub fn create_signature(
+    msg: &op::Message,
+    time_signed: u64,
+    key: &Key,
+) -> Result<rr::Record, Error> {
     let tsig = match key.algorithm {
-        Algorithm::HmacSha224 =>
-            create_tsig::<Hmac<sha2::Sha224>>(msg, time_signed, key)?,
-        Algorithm::HmacSha256 =>
-            create_tsig::<Hmac<sha2::Sha256>>(msg, time_signed, key)?,
-        Algorithm::HmacSha384 =>
-            create_tsig::<Hmac<sha2::Sha384>>(msg, time_signed, key)?,
-        Algorithm::HmacSha512 =>
-            create_tsig::<Hmac<sha2::Sha512>>(msg, time_signed, key)?,
+        Algorithm::HmacSha224 => create_tsig::<Hmac<sha2::Sha224>>(msg, time_signed, key)?,
+        Algorithm::HmacSha256 => create_tsig::<Hmac<sha2::Sha256>>(msg, time_signed, key)?,
+        Algorithm::HmacSha384 => create_tsig::<Hmac<sha2::Sha384>>(msg, time_signed, key)?,
+        Algorithm::HmacSha512 => create_tsig::<Hmac<sha2::Sha512>>(msg, time_signed, key)?,
     };
     let mut record = rr::Record::from_rdata(key.name.clone(), 0, tsig.try_into()?);
     record.set_dns_class(rr::DNSClass::ANY);

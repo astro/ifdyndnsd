@@ -13,6 +13,7 @@
       rust = fenix.packages.${system}.stable.withComponents [
         "cargo"
         "rustc"
+        "rustfmt"
         "clippy"
       ];
 
@@ -29,6 +30,8 @@
         cargoTestCommands = x: x ++ [
           # clippy
           ''cargo clippy --all --all-features --tests -- -D clippy::pedantic -D warnings -A await-holding-refcell-ref -A clippy::cast-possible-truncation''
+          # rustfmt
+          ''cargo fmt -- --check''
         ];
       };
       defaultPackage = packages.ifdyndnsd;

@@ -1,14 +1,14 @@
 mod config;
-mod ifaces;
 mod dns;
+mod ifaces;
 
+use cidr::IpCidr;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv6Addr};
 use std::rc::Rc;
 use std::str::FromStr;
 use std::time::{Duration, Instant};
-use cidr::IpCidr;
 use tokio::time::timeout;
 use trust_dns_client::rr::RecordType;
 
@@ -33,16 +33,15 @@ struct RecordState {
 
 impl RecordState {
     fn new(iface: config::Interface, server: Rc<RefCell<dns::Server>>, af: AddressFamily) -> Self {
-        let scope = IpCidr::from_str(
-            iface.scope.as_deref()
-                .unwrap_or_else(|| match af {
-                    AddressFamily::IPv4 => "0.0.0.0/0",
-                    AddressFamily::IPv6 => "2000::/3",
-                })
-        ).unwrap();
+        let scope = IpCidr::from_str(iface.scope.as_deref().unwrap_or_else(|| match af {
+            AddressFamily::IPv4 => "0.0.0.0/0",
+            AddressFamily::IPv6 => "2000::/3",
+        }))
+        .unwrap();
         match af {
-            AddressFamily::IPv4 if iface.neighbors.is_some() =>
-                panic!("neighbors are not supported on IPv4"),
+            AddressFamily::IPv4 if iface.neighbors.is_some() => {
+                panic!("neighbors are not supported on IPv4")
+            }
             AddressFamily::IPv4 if scope.is_ipv4() => {}
             AddressFamily::IPv6 if scope.is_ipv6() => {}
             _ => panic!("scope {} doesn't match address family {:?}", scope, af),
@@ -51,10 +50,7 @@ impl RecordState {
         RecordState {
             server,
             hostname: Rc::new(iface.name.clone()),
-            neighbors: Rc::new(
-                iface.neighbors
-                    .unwrap_or_default()
-            ),
+            neighbors: Rc::new(iface.neighbors.unwrap_or_default()),
 
             addr: None,
             scope,
@@ -65,7 +61,7 @@ impl RecordState {
 
     fn set_address(&mut self, addr: IpAddr) -> bool {
         // check scope
-        if ! self.scope.contains(&addr) {
+        if !self.scope.contains(&addr) {
             return false;
         }
 
@@ -89,15 +85,17 @@ impl RecordState {
             None => true,
 
             // retry if RETRY_INTERVAL elapsed
-            Some(update_tried) => Instant::now() >= update_tried + Duration::from_secs(RETRY_INTERVAL),
+            Some(update_tried) => {
+                Instant::now() >= update_tried + Duration::from_secs(RETRY_INTERVAL)
+            }
         }
     }
 
     pub fn next_timeout(&self) -> Option<Instant> {
         if self.dirty {
-            self.update_tried.map(
-                |update_tried| update_tried + Duration::from_secs(RETRY_INTERVAL)
-            ).or_else(|| Some(Instant::now()))
+            self.update_tried
+                .map(|update_tried| update_tried + Duration::from_secs(RETRY_INTERVAL))
+                .or_else(|| Some(Instant::now()))
         } else {
             None
         }
@@ -109,7 +107,12 @@ impl RecordState {
 
         let addr = self.addr.unwrap();
         if let Err(e) = self.update_addr(&self.hostname.clone(), &addr).await {
-            eprintln!("Error updating {} to {}: {}", self.hostname, self.addr.unwrap(), e);
+            eprintln!(
+                "Error updating {} to {}: {}",
+                self.hostname,
+                self.addr.unwrap(),
+                e
+            );
             // try again later
             self.dirty = true;
             return;
@@ -120,12 +123,22 @@ impl RecordState {
                 let net_segs = addr.segments();
                 let host_segs = neighbor_addr.segments();
                 let addr = Ipv6Addr::new(
-                    net_segs[0], net_segs[1], net_segs[2], net_segs[3],
-                    host_segs[4], host_segs[5], host_segs[6], host_segs[7],
-                ).into();
+                    net_segs[0],
+                    net_segs[1],
+                    net_segs[2],
+                    net_segs[3],
+                    host_segs[4],
+                    host_segs[5],
+                    host_segs[6],
+                    host_segs[7],
+                )
+                .into();
 
                 if let Err(e) = self.update_addr(neighbor_name, &addr).await {
-                    eprintln!("Error updating neighbor {} to {}: {}", neighbor_addr, addr, e);
+                    eprintln!(
+                        "Error updating neighbor {} to {}: {}",
+                        neighbor_addr, addr, e
+                    );
                 }
             }
         }
@@ -134,10 +147,8 @@ impl RecordState {
     async fn update_addr(&mut self, name: &str, addr: &IpAddr) -> Result<(), String> {
         let record_type;
         match addr {
-            IpAddr::V4(_) =>
-                record_type = RecordType::A,
-            IpAddr::V6(_) =>
-                record_type = RecordType::AAAA,
+            IpAddr::V4(_) => record_type = RecordType::A,
+            IpAddr::V6(_) => record_type = RecordType::AAAA,
         };
 
         let mut server = self.server.borrow_mut();
@@ -171,23 +182,30 @@ async fn main() -> Result<(), String> {
     let config_file = &args[1];
     let config = config::load(config_file)?;
 
-    let keys = config.keys.into_iter()
+    let keys = config
+        .keys
+        .into_iter()
         .map(|(name, key)| (name, Rc::new(key)))
         .collect::<HashMap<_, _>>();
     let mut servers = HashMap::new();
     for (name, key) in &keys {
-        servers.insert(name, Rc::new(RefCell::new(dns::Server::new(key.server, key).await)));
+        servers.insert(
+            name,
+            Rc::new(RefCell::new(dns::Server::new(key.server, key).await)),
+        );
     }
     let mut iface_states = HashMap::<String, Vec<RecordState>>::new();
     for a in config.a.unwrap_or_default() {
         let server = servers.get(&a.key).unwrap();
-        iface_states.entry(a.interface.clone())
+        iface_states
+            .entry(a.interface.clone())
             .or_insert_with(Vec::new)
             .push(RecordState::new(a, server.clone(), AddressFamily::IPv4));
     }
     for aaaa in config.aaaa.unwrap_or_default() {
         let server = servers.get(&aaaa.key).unwrap();
-        iface_states.entry(aaaa.interface.clone())
+        iface_states
+            .entry(aaaa.interface.clone())
             .or_insert_with(Vec::new)
             .push(RecordState::new(aaaa, server.clone(), AddressFamily::IPv6));
     }
@@ -208,14 +226,15 @@ async fn main() -> Result<(), String> {
                 }
             }
             Ok(None) =>
-                // netlink closed?
-                return Err("finished".to_string()),
+            // netlink closed?
+            {
+                return Err("finished".to_string())
+            }
             Err(_) => {
                 /* IDLE_TIMEOUT reached */
                 interval = NEVER_TIMEOUT;
 
-                'send_update:
-                for states in iface_states.values_mut() {
+                'send_update: for states in iface_states.values_mut() {
                     for state in states.iter_mut() {
                         if state.can_update() {
                             state.update().await;

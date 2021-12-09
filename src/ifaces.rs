@@ -1,25 +1,23 @@
-use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use futures::{
     future::ok,
     stream::{StreamExt, TryStreamExt},
 };
+use std::collections::HashMap;
+use std::convert::TryFrom;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
+use netlink_packet_route::{
+    constants::IFA_F_TEMPORARY, rtnl::address::nlas::Nla as AddrNla,
+    rtnl::link::nlas::Nla as LinkNla, LinkMessage, NetlinkPayload, RtnlMessage,
+};
 use rtnetlink::{
     constants::{RTMGRP_IPV4_IFADDR, RTMGRP_IPV6_IFADDR, RTMGRP_LINK},
     new_connection,
     sys::SocketAddr,
 };
-use netlink_packet_route::{
-    NetlinkPayload, LinkMessage, RtnlMessage,
-    constants::IFA_F_TEMPORARY,
-    rtnl::address::nlas::Nla as AddrNla,
-    rtnl::link::nlas::Nla as LinkNla,
-};
 use tokio::{
-    task::spawn,
     sync::mpsc::{channel, Receiver, Sender},
+    task::spawn,
 };
 
 pub fn start() -> Receiver<(String, IpAddr)> {
@@ -38,8 +36,7 @@ pub fn start() -> Receiver<(String, IpAddr)> {
 
 async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
     // Open the netlink socket
-    let (mut connection, handle, mut messages) = new_connection()
-        .map_err(|e| format!("{}", e))?;
+    let (mut connection, handle, mut messages) = new_connection().map_err(|e| format!("{}", e))?;
 
     // These flags specify what kinds of broadcast messages we want to listen for.
     let mgroup_flags = RTMGRP_LINK | RTMGRP_IPV4_IFADDR | RTMGRP_IPV6_IFADDR;
@@ -51,50 +48,54 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
     tokio::spawn(connection);
 
     let mut interface_names = HashMap::new();
-    let links = handle
-        .link()
-        .get()
-        .execute();
-    links.try_for_each(|m| {
-        let index = m.header.index;
-        if let Some(name) = link_message_name(&m) {
-            interface_names.insert(index, name.to_string());
-        }
-        ok(())
-    }).await.map_err(|e| format!("{:x?}", e))?;
+    let links = handle.link().get().execute();
+    links
+        .try_for_each(|m| {
+            let index = m.header.index;
+            if let Some(name) = link_message_name(&m) {
+                interface_names.insert(index, name.to_string());
+            }
+            ok(())
+        })
+        .await
+        .map_err(|e| format!("{:x?}", e))?;
 
     let mut initial = vec![];
-    handle.address().get().execute().try_for_each(|m| {
-        if let Some(name) = interface_names.get(&m.header.index) {
-            let mut addr = None;
-            let mut flags = None;
+    handle
+        .address()
+        .get()
+        .execute()
+        .try_for_each(|m| {
+            if let Some(name) = interface_names.get(&m.header.index) {
+                let mut addr = None;
+                let mut flags = None;
 
-            for nla in &m.nlas {
-                match nla {
-                    AddrNla::Address(a) =>
-                        addr = Some(a.clone()),
-                    AddrNla::Flags(f) =>
-                        flags = Some(f),
-                    _ => {}
+                for nla in &m.nlas {
+                    match nla {
+                        AddrNla::Address(a) => addr = Some(a.clone()),
+                        AddrNla::Flags(f) => flags = Some(f),
+                        _ => {}
+                    }
                 }
-            }
-            if let (Some(addr), Some(flags)) = (addr, flags) {
-                let temp = flags & IFA_F_TEMPORARY != 0;
-                if !temp {
-                    if let Some(addr) = buf_to_addr(addr) {
-                        initial.push((name.clone(), addr));
+                if let (Some(addr), Some(flags)) = (addr, flags) {
+                    let temp = flags & IFA_F_TEMPORARY != 0;
+                    if !temp {
+                        if let Some(addr) = buf_to_addr(addr) {
+                            initial.push((name.clone(), addr));
+                        }
                     }
                 }
             }
-        }
-        
-        ok(())
-    }).await.map_err(|e| format!("{:x?}", e))?;
+
+            ok(())
+        })
+        .await
+        .map_err(|e| format!("{:x?}", e))?;
 
     for value in initial {
         tx.send(value).await.unwrap();
     }
-    
+
     while let Some((message, _)) = messages.next().await {
         match message.payload {
             NetlinkPayload::InnerMessage(RtnlMessage::NewLink(m)) => {
@@ -113,10 +114,8 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
 
                     for nla in &m.nlas {
                         match nla {
-                            AddrNla::Address(a) =>
-                                addr_buf = Some(a.clone()),
-                            AddrNla::Flags(f) =>
-                                flags = Some(f),
+                            AddrNla::Address(a) => addr_buf = Some(a.clone()),
+                            AddrNla::Flags(f) => flags = Some(f),
                             _ => {}
                         }
                     }
@@ -142,26 +141,21 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
 
 fn buf_to_addr(addr: Vec<u8>) -> Option<IpAddr> {
     match addr.len() {
-        4 =>
-            <[u8; 4]>::try_from(addr)
+        4 => <[u8; 4]>::try_from(addr)
             .map(Ipv4Addr::from)
             .map(IpAddr::V4)
             .ok(),
-        16 =>
-            <[u8; 16]>::try_from(addr)
+        16 => <[u8; 16]>::try_from(addr)
             .map(Ipv6Addr::from)
             .map(IpAddr::V6)
             .ok(),
-        _ =>
-            None
+        _ => None,
     }
 }
 
 fn link_message_name(m: &LinkMessage) -> Option<&String> {
-    m.nlas.iter().find_map(|nla| {
-        match nla {
-            LinkNla::IfName(name) => Some(name),
-            _ => None,
-        }
+    m.nlas.iter().find_map(|nla| match nla {
+        LinkNla::IfName(name) => Some(name),
+        _ => None,
     })
 }
