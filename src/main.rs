@@ -21,7 +21,7 @@ enum AddressFamily {
 }
 
 struct RecordState {
-    server: Rc<RefCell<dns::DnsServer>>,
+    server: Rc<RefCell<dns::Server>>,
     hostname: Rc<String>,
     neighbors: Rc<HashMap<String, Ipv6Addr>>,
 
@@ -32,7 +32,7 @@ struct RecordState {
 }
 
 impl RecordState {
-    fn new(iface: config::Interface, server: Rc<RefCell<dns::DnsServer>>, af: AddressFamily) -> Self {
+    fn new(iface: config::Interface, server: Rc<RefCell<dns::Server>>, af: AddressFamily) -> Self {
         let scope = IpCidr::from_str(
             iface.scope.as_deref()
                 .unwrap_or_else(|| match af {
@@ -160,6 +160,9 @@ impl RecordState {
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
+    const IDLE_TIMEOUT: Duration = Duration::from_secs(1);
+    const NEVER_TIMEOUT: Duration = Duration::from_secs(365 * 86400);
+
     let args = std::env::args().collect::<Vec<_>>();
     if args.len() != 2 {
         eprintln!("Usage: {} <config.toml>", args[0]);
@@ -172,25 +175,23 @@ async fn main() -> Result<(), String> {
         .map(|(name, key)| (name, Rc::new(key)))
         .collect::<HashMap<_, _>>();
     let mut servers = HashMap::new();
-    for (name, key) in keys.iter() {
-        servers.insert(name, Rc::new(RefCell::new(dns::DnsServer::new(key.server, &key).await)));
+    for (name, key) in &keys {
+        servers.insert(name, Rc::new(RefCell::new(dns::Server::new(key.server, key).await)));
     }
     let mut iface_states = HashMap::<String, Vec<RecordState>>::new();
-    for a in config.a.unwrap_or_default().into_iter() {
+    for a in config.a.unwrap_or_default() {
         let server = servers.get(&a.key).unwrap();
         iface_states.entry(a.interface.clone())
             .or_insert_with(Vec::new)
             .push(RecordState::new(a, server.clone(), AddressFamily::IPv4));
     }
-    for aaaa in config.aaaa.unwrap_or_default().into_iter() {
+    for aaaa in config.aaaa.unwrap_or_default() {
         let server = servers.get(&aaaa.key).unwrap();
         iface_states.entry(aaaa.interface.clone())
             .or_insert_with(Vec::new)
             .push(RecordState::new(aaaa, server.clone(), AddressFamily::IPv6));
     }
 
-    const IDLE_TIMEOUT: Duration = Duration::from_secs(1);
-    const NEVER_TIMEOUT: Duration = Duration::from_secs(365 * 86400);
     let mut interval = NEVER_TIMEOUT;
 
     let mut addr_updates = ifaces::start();

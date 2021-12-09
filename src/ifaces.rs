@@ -58,7 +58,7 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
     links.try_for_each(|m| {
         let index = m.header.index;
         if let Some(name) = link_message_name(&m) {
-            interface_names.insert(index, name.to_owned());
+            interface_names.insert(index, name.to_string());
         }
         ok(())
     }).await.map_err(|e| format!("{:x?}", e))?;
@@ -91,7 +91,7 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
         ok(())
     }).await.map_err(|e| format!("{:x?}", e))?;
 
-    for value in initial.into_iter() {
+    for value in initial {
         tx.send(value).await.unwrap();
     }
     
@@ -100,7 +100,7 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
             NetlinkPayload::InnerMessage(RtnlMessage::NewLink(m)) => {
                 let index = m.header.index;
                 if let Some(name) = link_message_name(&m) {
-                    interface_names.insert(index, name.to_owned());
+                    interface_names.insert(index, name.to_string());
                 }
             }
             NetlinkPayload::InnerMessage(RtnlMessage::DelLink(m)) => {
@@ -158,10 +158,10 @@ fn buf_to_addr(addr: Vec<u8>) -> Option<IpAddr> {
 }
 
 fn link_message_name(m: &LinkMessage) -> Option<&String> {
-    m.nlas.iter().filter_map(|nla| {
+    m.nlas.iter().find_map(|nla| {
         match nla {
             LinkNla::IfName(name) => Some(name),
             _ => None,
         }
-    }).next()
+    })
 }

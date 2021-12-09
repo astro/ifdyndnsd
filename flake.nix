@@ -13,6 +13,7 @@
       rust = fenix.packages.${system}.stable.withComponents [
         "cargo"
         "rustc"
+        "clippy"
       ];
 
       # Override the version used in naersk
@@ -25,6 +26,10 @@
       packages.ifdyndnsd = naersk-lib.buildPackage {
         pname = "ifdyndnsd";
         src = ./.;
+        cargoTestCommands = x: x ++ [
+          # clippy
+          ''cargo clippy --all --all-features --tests -- -D clippy::pedantic -D warnings -A await-holding-refcell-ref -A clippy::cast-possible-truncation''
+        ];
       };
       defaultPackage = packages.ifdyndnsd;
 

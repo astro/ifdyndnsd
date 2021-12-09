@@ -11,11 +11,11 @@ use trust_dns_client::proto::error::ProtoResult;
 
 mod tsig;
 
-pub struct DnsServer {
+pub struct Server {
     client: AsyncClient,
 }
 
-impl DnsServer {
+impl Server {
     pub async fn new(addr: IpAddr, key: &crate::config::TsigKey) -> Self {
         let alg = tsig::Algorithm::from_name(
             &Name::from_ascii(&key.alg).unwrap()
@@ -39,7 +39,7 @@ impl DnsServer {
 
         tokio::spawn(bg);
 
-        DnsServer { client }
+        Server { client }
     }
 
     pub async fn query(&mut self, name: &str, record_type: RecordType) -> Result<Vec<IpAddr>, String> {
@@ -50,8 +50,8 @@ impl DnsServer {
         let result = response.answers()
             .iter()
             .filter_map(|answer| match answer.rdata() {
-                RData::A(addr) => Some(addr.clone().into()),
-                RData::AAAA(addr) => Some(addr.clone().into()),
+                RData::A(addr) => Some((*addr).into()),
+                RData::AAAA(addr) => Some((*addr).into()),
                 _ => None,
             })
             .collect::<Vec<_>>();
@@ -92,7 +92,7 @@ struct Signer {
 
 impl MessageFinalizer for Signer {
     fn finalize_message(&self, message: &Message, current_time: u32) -> ProtoResult<(Vec<Record>, Option<MessageVerifier>)> {
-        let record = tsig::create_signature(&message, current_time.into(), &self.key).unwrap();
+        let record = tsig::create_signature(message, current_time.into(), &self.key).unwrap();
         Ok((vec![record], None))
     }
     

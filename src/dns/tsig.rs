@@ -71,22 +71,20 @@ static ALGO_NAMES: Lazy<AlgoNames> = Lazy::new(|| AlgoNames {
 impl Algorithm {
     pub fn as_name(self) -> &'static rr::Name {
         let names = Lazy::force(&ALGO_NAMES);
-        use Algorithm::*;
         match self {
-            HmacSha224 => &names.sha224,
-            HmacSha256 => &names.sha256,
-            HmacSha384 => &names.sha384,
-            HmacSha512 => &names.sha512,
+            Algorithm::HmacSha224 => &names.sha224,
+            Algorithm::HmacSha256 => &names.sha256,
+            Algorithm::HmacSha384 => &names.sha384,
+            Algorithm::HmacSha512 => &names.sha512,
         }
     }
     pub fn from_name(name: &rr::Name) -> Result<Algorithm, UnknownAlgorithm> {
         let names = Lazy::force(&ALGO_NAMES);
-        use Algorithm::*;
         for (algo_name, algo) in &[
-            (&names.sha224, HmacSha224),
-            (&names.sha256, HmacSha256),
-            (&names.sha384, HmacSha384),
-            (&names.sha512, HmacSha512),
+            (&names.sha224, Algorithm::HmacSha224),
+            (&names.sha256, Algorithm::HmacSha256),
+            (&names.sha384, Algorithm::HmacSha384),
+            (&names.sha512, Algorithm::HmacSha512),
         ] {
             if name == *algo_name {
                 return Ok(*algo);
@@ -128,12 +126,15 @@ impl Key {
 }
 
 pub fn create_signature(msg: &op::Message, time_signed: u64, key: &Key) -> Result<rr::Record, Error> {
-    use Algorithm::*;
     let tsig = match key.algorithm {
-        HmacSha224 => create_tsig::<Hmac<sha2::Sha224>>(&msg, time_signed, &key)?,
-        HmacSha256 => create_tsig::<Hmac<sha2::Sha256>>(&msg, time_signed, &key)?,
-        HmacSha384 => create_tsig::<Hmac<sha2::Sha384>>(&msg, time_signed, &key)?,
-        HmacSha512 => create_tsig::<Hmac<sha2::Sha512>>(&msg, time_signed, &key)?,
+        Algorithm::HmacSha224 =>
+            create_tsig::<Hmac<sha2::Sha224>>(msg, time_signed, key)?,
+        Algorithm::HmacSha256 =>
+            create_tsig::<Hmac<sha2::Sha256>>(msg, time_signed, key)?,
+        Algorithm::HmacSha384 =>
+            create_tsig::<Hmac<sha2::Sha384>>(msg, time_signed, key)?,
+        Algorithm::HmacSha512 =>
+            create_tsig::<Hmac<sha2::Sha512>>(msg, time_signed, key)?,
     };
     let mut record = rr::Record::from_rdata(key.name.clone(), 0, tsig.try_into()?);
     record.set_dns_class(rr::DNSClass::ANY);
@@ -141,17 +142,16 @@ pub fn create_signature(msg: &op::Message, time_signed: u64, key: &Key) -> Resul
 }
 
 #[derive(Debug)]
-struct TSIG {
+struct Tsig {
     algorithm_name: rr::Name,
     time_signed: u64, // This is a actually a 48-bit value
     fudge: u16,
     mac: Vec<u8>,
     original_id: u16,
     error: op::ResponseCode,
-    other_data: Vec<u8>,
 }
 
-impl TSIG {
+impl Tsig {
     fn new(
         algorithm_name: rr::Name,
         time_signed: u64, // This is a actually a 48-bit value
@@ -159,28 +159,26 @@ impl TSIG {
         mac: Vec<u8>,
         original_id: u16,
         error: op::ResponseCode,
-        other_data: Vec<u8>,
     ) -> Self {
-        TSIG {
+        Tsig {
             algorithm_name,
             time_signed,
             fudge,
             mac,
             original_id,
             error,
-            other_data,
         }
     }
 }
 
-impl TryFrom<TSIG> for rr::RData {
+impl TryFrom<Tsig> for rr::RData {
     type Error = Error;
 
-    fn try_from(tsig: TSIG) -> Result<Self, Self::Error> {
+    fn try_from(tsig: Tsig) -> Result<Self, Self::Error> {
         let mut encoded = Vec::new();
-        let mut encoder = BinEncoder::new(&mut encoded);
-        encoder.set_canonical_names(true);
-        tsig.emit(&mut encoder)?;
+        let mut bin_encoder = BinEncoder::new(&mut encoded);
+        bin_encoder.set_canonical_names(true);
+        tsig.emit(&mut bin_encoder)?;
         Ok(rr::RData::Unknown {
             code: 250,
             rdata: rr::rdata::null::NULL::with(encoded),
@@ -188,23 +186,23 @@ impl TryFrom<TSIG> for rr::RData {
     }
 }
 
-impl BinEncodable for TSIG {
-    fn emit(&self, encoder: &mut BinEncoder) -> ProtoResult<()> {
-        self.algorithm_name.emit(encoder)?;
-        emit_u48(encoder, self.time_signed)?;
-        encoder.emit_u16(self.fudge)?;
-        encoder.emit_u16(self.mac.len() as u16)?;
-        encoder.emit_vec(&self.mac)?;
-        encoder.emit_u16(self.original_id)?;
-        encoder.emit_u16(self.error.into())?;
-        encoder.emit_u16(0)?; // Other data is of length 0
+impl BinEncodable for Tsig {
+    fn emit(&self, bin_encoder: &mut BinEncoder) -> ProtoResult<()> {
+        self.algorithm_name.emit(bin_encoder)?;
+        emit_u48(bin_encoder, self.time_signed)?;
+        bin_encoder.emit_u16(self.fudge)?;
+        bin_encoder.emit_u16(self.mac.len() as u16)?;
+        bin_encoder.emit_vec(&self.mac)?;
+        bin_encoder.emit_u16(self.original_id)?;
+        bin_encoder.emit_u16(self.error.into())?;
+        bin_encoder.emit_u16(0)?; // Other data is of length 0
         Ok(())
     }
 }
 
-fn emit_u48(encoder: &mut BinEncoder, n: u64) -> ProtoResult<()> {
-    encoder.emit_u16((n >> 32) as u16)?;
-    encoder.emit_u32(n as u32)?;
+fn emit_u48(bin_encoder: &mut BinEncoder, n: u64) -> ProtoResult<()> {
+    bin_encoder.emit_u16((n >> 32) as u16)?;
+    bin_encoder.emit_u32(n as u32)?;
     Ok(())
 }
 
@@ -212,48 +210,47 @@ fn create_tsig<T: Mac + NewMac>(
     msg: &op::Message,
     time_signed: u64,
     key: &Key,
-) -> Result<TSIG, Error> {
+) -> Result<Tsig, Error> {
     let mut encoded = Vec::new(); // TODO: initial capacity?
-    let mut encoder = BinEncoder::new(&mut encoded);
+    let mut bin_encoder = BinEncoder::new(&mut encoded);
     let fudge = 300; // FIXME: fudge hardcoded
                      // See RFC 2845, section 3.4. The "whole and complete message" in wire
-                     // format, before adding the TSIG RR.
-    msg.emit(&mut encoder)?;
-    //  3.4.2. TSIG Variables
+                     // format, before adding the Tsig RR.
+    msg.emit(&mut bin_encoder)?;
+    //  3.4.2. Tsig Variables
     //
     // Source       Field Name       Notes
     // -----------------------------------------------------------------------
-    // TSIG RR      NAME             Key name, in canonical wire format
-    // TSIG RR      CLASS            (Always ANY in the current specification)
-    // TSIG RR      TTL              (Always 0 in the current specification)
-    // TSIG RDATA   Algorithm Name   in canonical wire format
-    // TSIG RDATA   Time Signed      in network byte order
-    // TSIG RDATA   Fudge            in network byte order
-    // TSIG RDATA   Error            in network byte order
-    // TSIG RDATA   Other Len        in network byte order
-    // TSIG RDATA   Other Data       exactly as transmitted
-    encoder.set_canonical_names(true);
-    key.name.emit(&mut encoder)?;
-    rr::DNSClass::ANY.emit(&mut encoder)?;
-    encoder.emit_u32(0)?; // TTL
-    key.algorithm.as_name().emit(&mut encoder)?;
-    emit_u48(&mut encoder, time_signed)?;
-    encoder.emit_u16(fudge)?;
+    // Tsig RR      NAME             Key name, in canonical wire format
+    // Tsig RR      CLASS            (Always ANY in the current specification)
+    // Tsig RR      TTL              (Always 0 in the current specification)
+    // Tsig RDATA   Algorithm Name   in canonical wire format
+    // Tsig RDATA   Time Signed      in network byte order
+    // Tsig RDATA   Fudge            in network byte order
+    // Tsig RDATA   Error            in network byte order
+    // Tsig RDATA   Other Len        in network byte order
+    // Tsig RDATA   Other Data       exactly as transmitted
+    bin_encoder.set_canonical_names(true);
+    key.name.emit(&mut bin_encoder)?;
+    rr::DNSClass::ANY.emit(&mut bin_encoder)?;
+    bin_encoder.emit_u32(0)?; // TTL
+    key.algorithm.as_name().emit(&mut bin_encoder)?;
+    emit_u48(&mut bin_encoder, time_signed)?;
+    bin_encoder.emit_u16(fudge)?;
     let rcode = op::ResponseCode::NoError;
-    encoder.emit_u16(rcode.into())?;
-    encoder.emit_u16(0)?; // Other data is of length 0
+    bin_encoder.emit_u16(rcode.into())?;
+    bin_encoder.emit_u16(0)?; // Other data is of length 0
     let hmac = {
         let mut mac = T::new_from_slice(&key.secret)?;
         mac.update(&encoded);
         mac.finalize().into_bytes().to_vec()
     };
-    Ok(TSIG::new(
+    Ok(Tsig::new(
         key.algorithm.as_name().clone(),
         time_signed,
         fudge,
         hmac,
         msg.id(),
         rcode,
-        Vec::new(),
     ))
 }
