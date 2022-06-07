@@ -49,9 +49,9 @@ impl Server {
         let result = response
             .answers()
             .iter()
-            .filter_map(|answer| match answer.rdata() {
-                RData::A(addr) => Some((*addr).into()),
-                RData::AAAA(addr) => Some((*addr).into()),
+            .filter_map(|answer| match answer.data() {
+                Some(RData::A(addr)) => Some((*addr).into()),
+                Some(RData::AAAA(addr)) => Some((*addr).into()),
                 _ => None,
             })
             .collect::<Vec<_>>();

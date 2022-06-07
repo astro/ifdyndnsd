@@ -13,7 +13,7 @@ use netlink_packet_route::{
 use rtnetlink::{
     constants::{RTMGRP_IPV4_IFADDR, RTMGRP_IPV6_IFADDR, RTMGRP_LINK},
     new_connection,
-    sys::SocketAddr,
+    sys::{AsyncSocket, SocketAddr},
 };
 use tokio::{
     sync::mpsc::{channel, Receiver, Sender},
@@ -44,7 +44,7 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
     // A netlink socket address is created with said flags.
     let addr = SocketAddr::new(0, mgroup_flags);
     // Said address is bound so new conenctions and thus new message broadcasts can be received.
-    connection.socket_mut().bind(&addr).expect("failed to bind");
+    connection.socket_mut().socket_mut().bind(&addr).expect("failed to bind");
     tokio::spawn(connection);
 
     let mut interface_names = HashMap::new();

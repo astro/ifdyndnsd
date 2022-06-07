@@ -6,8 +6,8 @@ use std::{
     fmt,
 };
 
-use hmac::crypto_mac::InvalidKeyLength;
-use hmac::{Hmac, Mac, NewMac};
+use hmac::digest::InvalidLength;
+use hmac::{Hmac, Mac};
 use once_cell::sync::Lazy;
 use trust_dns_client::{
     op,
@@ -19,14 +19,14 @@ use trust_dns_client::{
 #[derive(Debug)]
 pub enum Error {
     Proto(ProtoError),
-    InvalidKeyLength(InvalidKeyLength),
+    InvalidLength(InvalidLength),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::Proto(e) => write!(f, "{}", e),
-            Error::InvalidKeyLength(e) => write!(f, "{}", e),
+            Error::InvalidLength(e) => write!(f, "{}", e),
         }
     }
 }
@@ -39,9 +39,9 @@ impl From<ProtoError> for Error {
     }
 }
 
-impl From<InvalidKeyLength> for Error {
-    fn from(e: InvalidKeyLength) -> Self {
-        Error::InvalidKeyLength(e)
+impl From<InvalidLength> for Error {
+    fn from(e: InvalidLength) -> Self {
+        Error::InvalidLength(e)
     }
 }
 
@@ -206,7 +206,7 @@ fn emit_u48(bin_encoder: &mut BinEncoder, n: u64) -> ProtoResult<()> {
     Ok(())
 }
 
-fn create_tsig<T: Mac + NewMac>(
+fn create_tsig<T: Mac + hmac::digest::KeyInit>(
     msg: &op::Message,
     time_signed: u64,
     key: &Key,
@@ -241,7 +241,7 @@ fn create_tsig<T: Mac + NewMac>(
     bin_encoder.emit_u16(rcode.into())?;
     bin_encoder.emit_u16(0)?; // Other data is of length 0
     let hmac = {
-        let mut mac = T::new_from_slice(&key.secret)?;
+        let mut mac = <T as Mac>::new_from_slice(&key.secret)?;
         mac.update(&encoded);
         mac.finalize().into_bytes().to_vec()
     };
