@@ -9,6 +9,7 @@ use std::net::{IpAddr, Ipv6Addr};
 use std::rc::Rc;
 use std::str::FromStr;
 use std::time::{Duration, Instant};
+use log::*;
 use tokio::time::timeout;
 use trust_dns_client::rr::RecordType;
 
@@ -107,7 +108,7 @@ impl RecordState {
 
         let addr = self.addr.unwrap();
         if let Err(e) = self.update_addr(&self.hostname.clone(), &addr).await {
-            eprintln!(
+            error!(
                 "Error updating {} to {}: {}",
                 self.hostname,
                 self.addr.unwrap(),
@@ -135,7 +136,7 @@ impl RecordState {
                 .into();
 
                 if let Err(e) = self.update_addr(neighbor_name, &addr).await {
-                    eprintln!(
+                    error!(
                         "Error updating neighbor {} to {}: {}",
                         neighbor_addr, addr, e
                     );
@@ -154,14 +155,14 @@ impl RecordState {
         let mut server = self.server.borrow_mut();
         match server.query(name, record_type).await {
             Ok(addrs) if addrs.len() == 1 && addrs[0] == *addr => {
-                println!("No address change for {} ({} == {:?})", name, addr, addrs);
+                info!("No address change for {} ({} == {:?})", name, addr, addrs);
                 return Ok(());
             }
             Ok(addrs) => {
-                println!("Outdated address for {}: {:?}", name, addrs);
+                info!("Outdated address for {}: {:?}", name, addrs);
             }
             Err(e) => {
-                eprintln!("Error querying for {} {}: {}", record_type, name, e);
+                error!("Error querying for {} {}: {}", record_type, name, e);
             }
         }
 
@@ -171,12 +172,14 @@ impl RecordState {
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
+    env_logger::init();
+
     const IDLE_TIMEOUT: Duration = Duration::from_secs(1);
     const NEVER_TIMEOUT: Duration = Duration::from_secs(365 * 86400);
 
     let args = std::env::args().collect::<Vec<_>>();
     if args.len() != 2 {
-        eprintln!("Usage: {} <config.toml>", args[0]);
+        error!("Usage: {} <config.toml>", args[0]);
         std::process::exit(1);
     }
     let config_file = &args[1];
@@ -215,24 +218,27 @@ async fn main() -> Result<(), String> {
     let mut addr_updates = ifaces::start();
 
     loop {
+        trace!("recv for {:?}", interval);
         match timeout(interval, addr_updates.recv()).await {
             Ok(Some((iface, addr))) => {
+                trace!("interface {}: address {}", iface, addr);
                 if let Some(states) = iface_states.get_mut(&iface) {
                     for record_state in states.iter_mut() {
                         if record_state.set_address(addr) {
+                            debug!("interface {}: new address {}", iface, addr);
                             interval = IDLE_TIMEOUT;
                         }
                     }
                 }
             }
-            Ok(None) =>
-            // netlink closed?
-            {
+            Ok(None) => {
+                error!("netlink disconnect");
                 return Err("finished".to_string())
             }
             Err(_) => {
                 /* IDLE_TIMEOUT reached */
                 interval = NEVER_TIMEOUT;
+                debug!("IDLE_TIMEOUT");
 
                 'send_update: for states in iface_states.values_mut() {
                     for state in states.iter_mut() {

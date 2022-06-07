@@ -5,6 +5,7 @@ use futures::{
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use log::*;
 
 use netlink_packet_route::{
     constants::IFA_F_TEMPORARY, rtnl::address::nlas::Nla as AddrNla,
@@ -26,8 +27,8 @@ pub fn start() -> Receiver<(String, IpAddr)> {
     spawn(async move {
         loop {
             match run(&mut tx).await {
-                Ok(()) => eprintln!("nfnetlink: restarting listener"),
-                Err(e) => eprintln!("nfnetlink error: {}", e),
+                Ok(()) => error!("nfnetlink: restarting listener"),
+                Err(e) => error!("nfnetlink error: {}", e),
             }
         }
     });
@@ -93,10 +94,12 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
         .map_err(|e| format!("{:x?}", e))?;
 
     for value in initial {
+        debug!("interface {}: initial address {:?}", value.0, value.1);
         tx.send(value).await.unwrap();
     }
 
     while let Some((message, _)) = messages.next().await {
+        trace!("netlink message: {:?}", message);
         match message.payload {
             NetlinkPayload::InnerMessage(RtnlMessage::NewLink(m)) => {
                 let index = m.header.index;
@@ -128,7 +131,7 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
                         }
                     }
                 } else {
-                    eprintln!("No such link with index={}", m.header.index);
+                    error!("No such link with index={}", m.header.index);
                 }
             }
             _ => {
