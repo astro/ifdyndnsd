@@ -8,7 +8,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use log::*;
 
 use netlink_packet_route::{
-    constants::IFA_F_TEMPORARY, rtnl::address::nlas::Nla as AddrNla,
+    constants::IFA_F_TEMPORARY, AddressMessage, rtnl::address::nlas::Nla as AddrNla,
     rtnl::link::nlas::Nla as LinkNla, LinkMessage, NetlinkPayload, RtnlMessage,
 };
 use rtnetlink::{
@@ -68,23 +68,8 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
         .execute()
         .try_for_each(|m| {
             if let Some(name) = interface_names.get(&m.header.index) {
-                let mut addr = None;
-                let mut flags = None;
-
-                for nla in &m.nlas {
-                    match nla {
-                        AddrNla::Address(a) => addr = Some(a.clone()),
-                        AddrNla::Flags(f) => flags = Some(f),
-                        _ => {}
-                    }
-                }
-                if let (Some(addr), Some(flags)) = (addr, flags) {
-                    let temp = flags & IFA_F_TEMPORARY != 0;
-                    if !temp {
-                        if let Some(addr) = buf_to_addr(addr) {
-                            initial.push((name.clone(), addr));
-                        }
-                    }
+                if let Some(addr) = message_local_addr(&m) {
+                    initial.push((name.clone(), addr));
                 }
             }
 
@@ -112,23 +97,8 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
             }
             NetlinkPayload::InnerMessage(RtnlMessage::NewAddress(m)) => {
                 if let Some(name) = interface_names.get(&m.header.index) {
-                    let mut addr_buf = None;
-                    let mut flags = None;
-
-                    for nla in &m.nlas {
-                        match nla {
-                            AddrNla::Address(a) => addr_buf = Some(a.clone()),
-                            AddrNla::Flags(f) => flags = Some(f),
-                            _ => {}
-                        }
-                    }
-                    if let (Some(addr_buf), Some(flags)) = (addr_buf, flags) {
-                        let temp = flags & IFA_F_TEMPORARY != 0;
-                        if !temp {
-                            if let Some(addr) = buf_to_addr(addr_buf) {
-                                tx.send((name.clone(), addr)).await.unwrap();
-                            }
-                        }
+                    if let Some(addr) = message_local_addr(&m) {
+                        tx.send((name.clone(), addr)).await.unwrap();
                     }
                 } else {
                     error!("No such link with index={}", m.header.index);
@@ -140,6 +110,33 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+fn message_local_addr(m: &AddressMessage) -> Option<IpAddr> {
+    let mut addr_buf = None;
+    let mut local_buf = None;
+    let mut flags = None;
+
+    for nla in &m.nlas {
+        match nla {
+            AddrNla::Address(a) => addr_buf = Some(a.clone()),
+            AddrNla::Local(a) => local_buf = Some(a.clone()),
+            AddrNla::Flags(f) => flags = Some(f),
+            _ => {}
+        }
+    }
+    match (addr_buf.and_then(buf_to_addr), local_buf.and_then(buf_to_addr), flags) {
+        (_, _, Some(flags)) if flags & IFA_F_TEMPORARY != 0 =>
+            // ignore temporary addresses
+            None,
+        (_, Some(addr), _) =>
+            // prefer local address in case of pointopoint ifaces
+            Some(addr),
+        (Some(addr), _, _) =>
+            Some(addr),
+        (_, _, _) =>
+            None
+    }
 }
 
 fn buf_to_addr(addr: Vec<u8>) -> Option<IpAddr> {
