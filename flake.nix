@@ -8,7 +8,15 @@
   };
 
   outputs = { self, nixpkgs, utils, naersk, fenix }:
-    utils.lib.eachDefaultSystem (system: let
+    let
+      systems = [
+          "i686-linux" "x86_64-linux"
+          #"armv6l-linux"
+          #"armv7l-linux"
+          "aarch64-linux"
+          #"riscv64-linux"
+      ];
+    in utils.lib.eachSystem systems (system: let
       pkgs = nixpkgs.legacyPackages."${system}";
       rust = fenix.packages.${system}.stable.withComponents [
         "cargo"
