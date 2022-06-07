@@ -37,7 +37,11 @@
         src = ./.;
         cargoTestCommands = x: x ++ [
           # clippy
-          ''cargo clippy --all --all-features --tests -- -D clippy::pedantic -D warnings -A await-holding-refcell-ref -A clippy::cast-possible-truncation''
+          ''cargo clippy --all --all-features --tests -- \
+              -D clippy::pedantic \
+              -D warnings \
+              -A clippy::await-holding-refcell-ref \
+              -A clippy::await-holding-refcell-ref''
           # rustfmt
           ''cargo fmt -- --check''
         ];

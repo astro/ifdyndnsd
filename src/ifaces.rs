@@ -2,14 +2,14 @@ use futures::{
     future::ok,
     stream::{StreamExt, TryStreamExt},
 };
+use log::{debug, error, trace};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use log::*;
 
 use netlink_packet_route::{
-    constants::IFA_F_TEMPORARY, AddressMessage, rtnl::address::nlas::Nla as AddrNla,
-    rtnl::link::nlas::Nla as LinkNla, LinkMessage, NetlinkPayload, RtnlMessage,
+    constants::IFA_F_TEMPORARY, rtnl::address::nlas::Nla as AddrNla,
+    rtnl::link::nlas::Nla as LinkNla, AddressMessage, LinkMessage, NetlinkPayload, RtnlMessage,
 };
 use rtnetlink::{
     constants::{RTMGRP_IPV4_IFADDR, RTMGRP_IPV6_IFADDR, RTMGRP_LINK},
@@ -45,7 +45,11 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
     // A netlink socket address is created with said flags.
     let addr = SocketAddr::new(0, mgroup_flags);
     // Said address is bound so new conenctions and thus new message broadcasts can be received.
-    connection.socket_mut().socket_mut().bind(&addr).expect("failed to bind");
+    connection
+        .socket_mut()
+        .socket_mut()
+        .bind(&addr)
+        .expect("failed to bind");
     tokio::spawn(connection);
 
     let mut interface_names = HashMap::new();
@@ -125,17 +129,23 @@ fn message_local_addr(m: &AddressMessage) -> Option<IpAddr> {
             _ => {}
         }
     }
-    match (addr_buf.and_then(buf_to_addr), local_buf.and_then(buf_to_addr), flags) {
+    match (
+        addr_buf.and_then(buf_to_addr),
+        local_buf.and_then(buf_to_addr),
+        flags,
+    ) {
         (_, _, Some(flags)) if flags & IFA_F_TEMPORARY != 0 =>
-            // ignore temporary addresses
-            None,
-        (_, Some(addr), _) =>
-            // prefer local address in case of pointopoint ifaces
-            Some(addr),
-        (Some(addr), _, _) =>
-            Some(addr),
-        (_, _, _) =>
+        // ignore temporary addresses
+        {
             None
+        }
+        (_, Some(addr), _) =>
+        // prefer local address in case of pointopoint ifaces
+        {
+            Some(addr)
+        }
+        (Some(addr), _, _) => Some(addr),
+        (_, _, _) => None,
     }
 }
 

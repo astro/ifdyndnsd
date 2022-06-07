@@ -3,13 +3,13 @@ mod dns;
 mod ifaces;
 
 use cidr::IpCidr;
+use log::{debug, error, info, trace};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv6Addr};
 use std::rc::Rc;
 use std::str::FromStr;
 use std::time::{Duration, Instant};
-use log::*;
 use tokio::time::timeout;
 use trust_dns_client::rr::RecordType;
 
@@ -41,7 +41,7 @@ impl RecordState {
         .unwrap();
         match af {
             AddressFamily::IPv4 if iface.neighbors.is_some() => {
-                panic!("neighbors are not supported on IPv4")
+                panic!("neighbors are not supported on IPv4");
             }
             AddressFamily::IPv4 if scope.is_ipv4() => {}
             AddressFamily::IPv6 if scope.is_ipv6() => {}
@@ -172,10 +172,10 @@ impl RecordState {
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
-    env_logger::init();
-
     const IDLE_TIMEOUT: Duration = Duration::from_secs(1);
     const NEVER_TIMEOUT: Duration = Duration::from_secs(365 * 86400);
+
+    env_logger::init();
 
     let args = std::env::args().collect::<Vec<_>>();
     if args.len() != 2 {
@@ -233,7 +233,7 @@ async fn main() -> Result<(), String> {
             }
             Ok(None) => {
                 error!("netlink disconnect");
-                return Err("finished".to_string())
+                return Err("finished".to_string());
             }
             Err(_) => {
                 /* IDLE_TIMEOUT reached */
