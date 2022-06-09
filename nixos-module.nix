@@ -22,6 +22,12 @@
       type = types.str;
       default = "ifdyndnsd";
     };
+    logLevel = mkOption {
+      type = types.enum [
+        "trace" "debug" "info" "warn" "error"
+      ];
+      default = "info";
+    };
   };
 
   config =
@@ -37,6 +43,7 @@
 
       systemd.services.ifdyndnsd = {
         wantedBy = [ "multi-user.target" ];
+        environment.RUST_LOG = "ifdyndnsd=${cfg.logLevel}";
         serviceConfig = {
           Type = "simple";
           ExecStart = "${cfg.package}/bin/ifdyndnsd ${configFile}";
