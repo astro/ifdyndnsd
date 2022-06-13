@@ -34,7 +34,7 @@ struct RecordState {
 
 impl RecordState {
     fn new(iface: config::Interface, server: Rc<RefCell<dns::Server>>, af: AddressFamily) -> Self {
-        let scope = IpCidr::from_str(iface.scope.as_deref().unwrap_or_else(|| match af {
+        let scope = IpCidr::from_str(iface.scope.as_deref().unwrap_or(match af {
             AddressFamily::IPv4 => "0.0.0.0/0",
             AddressFamily::IPv6 => "2000::/3",
         }))
@@ -146,10 +146,9 @@ impl RecordState {
     }
 
     async fn update_addr(&mut self, name: &str, addr: &IpAddr) -> Result<(), String> {
-        let record_type;
-        match addr {
-            IpAddr::V4(_) => record_type = RecordType::A,
-            IpAddr::V6(_) => record_type = RecordType::AAAA,
+        let record_type = match addr {
+            IpAddr::V4(_) => RecordType::A,
+            IpAddr::V6(_) => RecordType::AAAA,
         };
 
         let mut server = self.server.borrow_mut();
