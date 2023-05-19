@@ -25,12 +25,24 @@ server = "192.0.2.53"
 name = "mykey.example.com"
 # Algorithm to use for TSIG
 alg = "hmac-sha256"
-# # Plain-text secret; exclusive with `secret-base64`
+# Secrets
+# Exactly one of the parameters
+# - `secret`
+# - `secret-base64`,
+# - `secret-file`
+# - `secret-file-base64`
+# must be specified.
+# # Plain-text secret
 # secret = "topsecret\n"
-# Secret encoded in base64 just like BIND uses. This allows using
+# # Secret encoded in base64 just like BIND uses. This allows using
 # binary strings.
 secret-base64 = "dG9wc2VjcmV0Cg=="
-
+# # Secrets from files
+# Both secret types from above can also be read from a file
+# secret-file = "/run/user/secret.file"
+# for a plain text secret or 
+# secret-file-base64 = "/run/user/secret.file"
+# for a base64 encoded secret
 # Update an A record (IPv4)
 [[a]]
 # Select `[key.mykey]` for server/key settings

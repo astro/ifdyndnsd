@@ -12,21 +12,36 @@ pub struct TsigKey {
     pub secret: Option<String>,
     #[serde(rename = "secret-base64")]
     pub secret_base64: Option<String>,
+    #[serde(rename = "secret-file")]
+    pub secret_file: Option<String>,
+    #[serde(rename = "secret-file-base64")]
+    pub secret_file_base64: Option<String>,
 }
 
 impl TsigKey {
     pub fn get_secret(&self) -> Vec<u8> {
-        match (&self.secret, &self.secret_base64) {
-            (Some(_), Some(_)) => panic!(
-                "Both secret and secret_base64 configured for key {}",
+        match (&self.secret, &self.secret_base64, &self.secret_file, &self.secret_file_base64) {
+            (Some(secret), None, None,None) => secret.bytes().collect::<Vec<u8>>(),
+            (None, Some(secret_base64), None, None) => base64::decode(secret_base64).unwrap(),
+            (None, None, Some(secret_file), None) => {
+                let file = File::open(secret_file).map_err(|e| format!("Failed to open the specified secret-file: {}", e)).unwrap();
+                file.bytes().map(|byte|byte.unwrap()).collect()
+            },
+            (None, None, None, Some(secret_file_base64)) => {
+                let mut file = File::open(secret_file_base64).map_err(|e| format!("Failed to open the specified secret-file-base64: {}", e)).unwrap();
+                let mut buf = Vec::new();
+                file.read_to_end(&mut buf).unwrap();
+                base64::decode(buf).unwrap()
+            },
+            (None, None, None, None) => panic!(
+                "Neither secret nor secret-base64 nor secret-file nor secret-file-base64 configured for key {}. Configure one of the secret parameters.",
                 self.name
             ),
-            (None, None) => panic!(
-                "No secret or secret_base64 configured for key {}",
+            (_, _, _, _) => panic!(
+                "More than one of the parameters secret, secret-base64 or secret-file configured for key {}.
+                Configure exactly one of the secret parameters.",
                 self.name
             ),
-            (Some(secret), _) => secret.bytes().collect::<Vec<u8>>(),
-            (_, Some(secret_base64)) => base64::decode(secret_base64).unwrap(),
         }
     }
 }
