@@ -1,7 +1,9 @@
-{ self }:
-{ pkgs, config, lib, ... }:
-
-{
+{self}: {
+  pkgs,
+  config,
+  lib,
+  ...
+}: {
   options.services.ifdyndnsd = with lib; {
     enable = mkOption {
       default = false;
@@ -24,17 +26,21 @@
     };
     logLevel = mkOption {
       type = types.enum [
-        "trace" "debug" "info" "warn" "error"
+        "trace"
+        "debug"
+        "info"
+        "warn"
+        "error"
       ];
       default = "info";
     };
   };
 
-  config =
-    let
-      cfg = config.services.ifdyndnsd;
-      configFile = builtins.toFile "ifdyndnsd.toml" cfg.config;
-    in lib.mkIf cfg.enable {
+  config = let
+    cfg = config.services.ifdyndnsd;
+    configFile = builtins.toFile "ifdyndnsd.toml" cfg.config;
+  in
+    lib.mkIf cfg.enable {
       users.users.${cfg.user} = {
         isSystemUser = true;
         group = cfg.group;
@@ -42,7 +48,7 @@
       users.groups.${cfg.group} = {};
 
       systemd.services.ifdyndnsd = {
-        wantedBy = [ "multi-user.target" ];
+        wantedBy = ["multi-user.target"];
         environment.RUST_LOG = "ifdyndnsd=${cfg.logLevel}";
         serviceConfig = {
           Type = "simple";

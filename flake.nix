@@ -7,16 +7,23 @@
     fenix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, utils, naersk, fenix }:
-    let
-      systems = [
-          "i686-linux" "x86_64-linux"
-          #"armv6l-linux"
-          #"armv7l-linux"
-          "aarch64-linux"
-          #"riscv64-linux"
-      ];
-    in utils.lib.eachSystem systems (system: let
+  outputs = {
+    self,
+    nixpkgs,
+    utils,
+    naersk,
+    fenix,
+  }: let
+    systems = [
+      "i686-linux"
+      "x86_64-linux"
+      #"armv6l-linux"
+      #"armv7l-linux"
+      "aarch64-linux"
+      #"riscv64-linux"
+    ];
+  in
+    utils.lib.eachSystem systems (system: let
       pkgs = nixpkgs.legacyPackages."${system}";
       rust = fenix.packages.${system}.stable.withComponents [
         "cargo"
@@ -35,15 +42,17 @@
       packages.ifdyndnsd = naersk-lib.buildPackage {
         pname = "ifdyndnsd";
         src = ./.;
-        cargoTestCommands = x: x ++ [
-          # clippy
-          ''cargo clippy --all --all-features --tests -- \
-              -D clippy::pedantic \
-              -D warnings \
-              -A clippy::await-holding-refcell-ref''
-          # rustfmt
-          ''cargo fmt -- --check''
-        ];
+        cargoTestCommands = x:
+          x
+          ++ [
+            # clippy
+            ''              cargo clippy --all --all-features --tests -- \
+                            -D clippy::pedantic \
+                            -D warnings \
+                            -A clippy::await-holding-refcell-ref''
+            # rustfmt
+            ''cargo fmt -- --check''
+          ];
       };
       defaultPackage = packages.ifdyndnsd;
 
@@ -60,11 +69,12 @@
         nativeBuildInputs = with defaultPackage;
           nativeBuildInputs ++ buildInputs;
       };
-    }) // {
+    })
+    // {
       overlay = final: prev: {
         ifdyndnsd = self.packages.${prev.system};
       };
 
-      nixosModule = import ./nixos-module.nix { inherit self; };
+      nixosModule = import ./nixos-module.nix {inherit self;};
     };
 }
