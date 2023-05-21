@@ -10,5 +10,5 @@ async fn main() -> Result<(), String> {
         std::process::exit(1);
     }
     let config_file = &args[1];
-    ifdyndnsd::run(&config_file).await
+    ifdyndnsd::run(config_file).await
 }
