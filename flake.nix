@@ -68,6 +68,7 @@
       devShell = pkgs.mkShell {
         nativeBuildInputs = with defaultPackage;
           nativeBuildInputs ++ buildInputs;
+        packages = [pkgs.cargo-edit];
       };
     })
     // {
