@@ -1,3 +1,5 @@
+use base64::engine::general_purpose;
+use base64::Engine;
 use serde_derive::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;
@@ -22,7 +24,7 @@ impl TsigKey {
     pub fn get_secret(&self) -> Vec<u8> {
         match (&self.secret, &self.secret_base64, &self.secret_file, &self.secret_file_base64) {
             (Some(secret), None, None,None) => secret.bytes().collect::<Vec<u8>>(),
-            (None, Some(secret_base64), None, None) => base64::decode(secret_base64).unwrap(),
+            (None, Some(secret_base64), None, None) => general_purpose::STANDARD.decode(secret_base64).unwrap(),
             (None, None, Some(secret_file), None) => {
                 let file = File::open(secret_file).map_err(|e| format!("Failed to open the specified secret-file: {}", e)).unwrap();
                 file.bytes().map(|byte|byte.unwrap()).collect()
@@ -31,7 +33,7 @@ impl TsigKey {
                 let mut file = File::open(secret_file_base64).map_err(|e| format!("Failed to open the specified secret-file-base64: {}", e)).unwrap();
                 let mut buf = Vec::new();
                 file.read_to_end(&mut buf).unwrap();
-                base64::decode(buf).unwrap()
+                general_purpose::STANDARD.decode(buf).unwrap()
             },
             (None, None, None, None) => panic!(
                 "Neither secret nor secret-base64 nor secret-file nor secret-file-base64 configured for key {}. Configure one of the secret parameters.",
