@@ -3,18 +3,20 @@ use futures::{
     stream::{StreamExt, TryStreamExt},
 };
 use log::{debug, error, trace};
+use netlink_packet_core::NetlinkPayload;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use netlink_packet_route::{
     constants::IFA_F_TEMPORARY, rtnl::address::nlas::Nla as AddrNla,
-    rtnl::link::nlas::Nla as LinkNla, AddressMessage, LinkMessage, NetlinkPayload, RtnlMessage,
+    rtnl::link::nlas::Nla as LinkNla, AddressMessage, LinkMessage, RtnlMessage,
 };
+
+use netlink_sys::{AsyncSocket, SocketAddr};
 use rtnetlink::{
     constants::{RTMGRP_IPV4_IFADDR, RTMGRP_IPV6_IFADDR, RTMGRP_LINK},
     new_connection,
-    sys::{AsyncSocket, SocketAddr},
 };
 use tokio::{
     sync::mpsc::{channel, Receiver, Sender},
