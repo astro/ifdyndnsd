@@ -25,8 +25,8 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::Proto(e) => write!(f, "{}", e),
-            Error::InvalidLength(e) => write!(f, "{}", e),
+            Error::Proto(e) => write!(f, "{e}"),
+            Error::InvalidLength(e) => write!(f, "{e}"),
         }
     }
 }
