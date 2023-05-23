@@ -23,6 +23,7 @@ use tokio::{
     task::spawn,
 };
 
+#[must_use]
 pub fn start() -> Receiver<(String, IpAddr)> {
     let (mut tx, rx) = channel(1);
 
@@ -39,7 +40,7 @@ pub fn start() -> Receiver<(String, IpAddr)> {
 
 async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
     // Open the netlink socket
-    let (mut connection, handle, mut messages) = new_connection().map_err(|e| format!("{}", e))?;
+    let (mut connection, handle, mut messages) = new_connection().map_err(|e| format!("{e}"))?;
 
     // These flags specify what kinds of broadcast messages we want to listen for.
     let mgroup_flags = RTMGRP_LINK | RTMGRP_IPV4_IFADDR | RTMGRP_IPV6_IFADDR;
@@ -65,7 +66,7 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
             ok(())
         })
         .await
-        .map_err(|e| format!("{:x?}", e))?;
+        .map_err(|e| format!("{e:x?}"))?;
 
     let mut initial = vec![];
     handle
@@ -82,7 +83,7 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
             ok(())
         })
         .await
-        .map_err(|e| format!("{:x?}", e))?;
+        .map_err(|e| format!("{e:x?}"))?;
 
     for value in initial {
         debug!("interface {}: initial address {:?}", value.0, value.1);

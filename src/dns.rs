@@ -17,6 +17,14 @@ pub struct Server {
 }
 
 impl Server {
+    /// # Panics
+    ///
+    /// Will panic if
+    ///
+    /// - Configuration parameter `key.alg` is non-ascii or doesn't match a valid algorithm.
+    /// - Configuration parameter `key.name` could not be parsed into a UTF-8 string.
+    /// - Establishing a connection to the DNS endpoint failed.
+    ///
     pub async fn new(addr: IpAddr, key: &crate::config::TsigKey) -> Self {
         let alg = tsig::Algorithm::from_name(&Name::from_ascii(&key.alg).unwrap()).unwrap();
         let signer = Signer {
@@ -36,7 +44,13 @@ impl Server {
 
         Server { client }
     }
-
+    /// # Errors
+    ///
+    /// Will return `Err` if
+    ///
+    /// - `name` could not be parsed into a UTF-8 string.
+    /// - The DNS query failed.
+    ///
     pub async fn query(
         &mut self,
         name: &str,
@@ -45,7 +59,7 @@ impl Server {
         let query = self
             .client
             .query(Name::from_str(name)?, DNSClass::IN, record_type);
-        let response = query.await.map_err(|e| format!("{}", e))?;
+        let response = query.await.map_err(|e| format!("{e}"))?;
 
         let result = response
             .answers()
@@ -59,7 +73,14 @@ impl Server {
 
         Ok(result)
     }
-
+    /// # Errors
+    ///
+    /// Will return `Err` in case
+    ///
+    /// - `hostname` can not be parsed into a UTF-8 string.
+    /// - deletion of resource record set failed.
+    /// - appending the new record failed.
+    ///
     pub async fn update(&mut self, hostname: &str, addr: IpAddr) -> Result<(), String> {
         let rdata = match addr {
             IpAddr::V4(addr) => RData::A(addr),
@@ -69,14 +90,14 @@ impl Server {
         let origin = name.base_name();
         let rec = Record::from_rdata(name, 0, rdata);
         let query = self.client.delete_rrset(rec.clone(), origin.clone());
-        let response = query.await.map_err(|e| format!("{}", e))?;
+        let response = query.await.map_err(|e| format!("{e}"))?;
 
         if response.response_code() != ResponseCode::NoError {
             return Err(format!("Response code: {}", response.response_code()));
         }
         let query = self.client.append(rec, origin, false);
         info!("DNS update: {} {}", hostname, addr);
-        let response = query.await.map_err(|e| format!("{}", e))?;
+        let response = query.await.map_err(|e| format!("{e}"))?;
 
         if response.response_code() != ResponseCode::NoError {
             return Err(format!("Response code: {}", response.response_code()));

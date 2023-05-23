@@ -33,6 +33,10 @@ pub struct RecordState {
 }
 
 impl RecordState {
+    /// # Panics
+    ///
+    /// Will panic if the `scope` setting could not be parsed as a
+    /// Classless Inter-Domain Routing (CIDR) address.
     pub fn new(
         iface: config::Interface,
         server: Rc<RefCell<dns::Server>>,
@@ -81,6 +85,7 @@ impl RecordState {
         true
     }
 
+    #[must_use]
     pub fn can_update(&self) -> bool {
         match self.update_tried {
             // nothing to do
@@ -96,6 +101,7 @@ impl RecordState {
         }
     }
 
+    #[must_use]
     pub fn next_timeout(&self) -> Option<Instant> {
         if self.dirty {
             self.update_tried
@@ -105,7 +111,9 @@ impl RecordState {
             None
         }
     }
-
+    /// # Panics
+    ///
+    /// Will panic if the config (`[[aaaa]]` or `[[a]]`) misses an `address`.
     pub async fn update(&mut self) {
         self.dirty = false;
         self.update_tried = Some(Instant::now());
@@ -172,6 +180,14 @@ impl RecordState {
         server.update(name, *addr).await
     }
 }
+/// # Errors
+///
+/// Will return `Err` if `config_file` does not exist or the user does not have
+/// permission to read it.
+///
+/// # Panics
+///
+/// Will panic if the config (`[[aaaa]]` or `[[a]]`) misses a key.
 pub async fn run(config_file: &str) -> Result<(), String> {
     const IDLE_TIMEOUT: Duration = Duration::from_secs(1);
     const NEVER_TIMEOUT: Duration = Duration::from_secs(365 * 86400);
