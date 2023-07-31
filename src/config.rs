@@ -56,7 +56,7 @@ impl TsigKey {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Interface {
+pub struct UpdateTask {
     pub key: String,
     pub name: String,
     pub interface: String,
@@ -67,8 +67,8 @@ pub struct Interface {
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub keys: HashMap<String, TsigKey>,
-    pub a: Option<Vec<Interface>>,
-    pub aaaa: Option<Vec<Interface>>,
+    pub a: Option<Vec<UpdateTask>>,
+    pub aaaa: Option<Vec<UpdateTask>>,
 }
 /// # Errors
 ///
