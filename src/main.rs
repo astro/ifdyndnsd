@@ -2,7 +2,9 @@ use log::error;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
-    env_logger::init();
+    let env = env_logger::Env::default().filter_or("RUST_LOG", "info");
+
+    env_logger::init_from_env(env);
 
     let args = std::env::args().collect::<Vec<_>>();
     if args.len() != 2 {

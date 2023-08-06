@@ -49,6 +49,9 @@ secret-base64 = "dG9wc2VjcmV0Cg=="
 key = "mykey"
 # DNS name to update
 name = "dyndns.example.net"
+zone = "example.net"
+# # Optionally define a time to live (ttl) for the record to set. The default ttl is 0
+# ttl = 7200
 # Network interface to watch for an IP address
 interface = "ppp0"
 # # Optionally select the proper IP address by subnet. This is the
@@ -61,6 +64,9 @@ interface = "ppp0"
 key = "mykey"
 # DNS name to update
 name = "dyndns.example.net"
+zone = "example.net"
+# # Optionally define a time to live (ttl) for the record to set. The default ttl is 0
+# ttl = 7200
 # Network interface to watch for an IP address
 interface = "ppp0"
 # # Optionally select the proper IP address by subnet. This is the

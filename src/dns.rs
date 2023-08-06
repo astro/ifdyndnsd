@@ -77,26 +77,38 @@ impl Server {
     ///
     /// Will return `Err` in case
     ///
-    /// - `hostname` can not be parsed into a UTF-8 string.
+    /// - `name` can not be parsed into a UTF-8 string.
     /// - deletion of resource record set failed.
     /// - appending the new record failed.
     ///
-    pub async fn update(&mut self, hostname: &str, addr: IpAddr) -> Result<(), String> {
+
+    pub async fn update(
+        &mut self,
+        name: &str,
+        addr: IpAddr,
+        zone: Option<&str>,
+        ttl: u32,
+    ) -> Result<(), String> {
         let rdata = match addr {
             IpAddr::V4(addr) => RData::A(addr),
             IpAddr::V6(addr) => RData::AAAA(addr),
         };
-        let name = Name::from_str(hostname)?;
-        let origin = name.base_name();
-        let rec = Record::from_rdata(name, 0, rdata);
-        let query = self.client.delete_rrset(rec.clone(), origin.clone());
+        let name = Name::from_str(name)?;
+
+        // This is introduced to deal with legacy configurations without a `zone` set.
+        let zone = match zone {
+            Some(zone) => Name::from_str(zone)?,
+            None => name.base_name(),
+        };
+        let rec = Record::from_rdata(name.clone(), ttl, rdata);
+        let query = self.client.delete_rrset(rec.clone(), zone.clone());
         let response = query.await.map_err(|e| format!("{e}"))?;
 
         if response.response_code() != ResponseCode::NoError {
             return Err(format!("Response code: {}", response.response_code()));
         }
-        let query = self.client.append(rec, origin, false);
-        info!("DNS update: {} {}", hostname, addr);
+        let query = self.client.append(rec, zone, false);
+        info!("DNS update: {} {}", name, addr);
         let response = query.await.map_err(|e| format!("{e}"))?;
 
         if response.response_code() != ResponseCode::NoError {
