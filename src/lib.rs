@@ -58,13 +58,19 @@ impl RecordState {
             _ => panic!("scope {} doesn't match address family {:?}", scope, af),
         }
 
-        let zone = match update_task.zone {
-            Some(zone) => Some(Rc::new(zone)),
-            None => {
-                warn!("Your configuration misses the `zone` parameter. This field will be mandatory in a future release.");
-                None
-            }
+        let zone = if let Some(zone) = update_task.zone {
+            Some(Rc::new(zone))
+        } else {
+            warn!("Your configuration misses the `zone` parameter. This field will be mandatory in a future release.");
+            None
         };
+        //let zone = match update_task.zone {
+        //    Some(zone) => Some(Rc::new(zone)),
+        //    None => {
+        //        warn!("Your configuration misses the `zone` parameter. This field will be mandatory in a future release.");
+        //        None
+        //    }
+        //};
 
         RecordState {
             server,
@@ -73,7 +79,7 @@ impl RecordState {
 
             addr: None,
             ttl: update_task.ttl.unwrap_or(0),
-            zone: zone,
+            zone,
             scope,
             dirty: false,
             update_tried: None,
@@ -189,10 +195,7 @@ impl RecordState {
             }
         }
 
-        let zone = match &self.zone {
-            Some(zone) => Some(zone.as_str()),
-            None => None,
-        };
+        let zone = self.zone.as_ref().map(|zone| zone.as_str());
 
         server.update(name, *addr, zone, self.ttl).await
     }
