@@ -3,7 +3,7 @@ pub mod dns;
 pub mod ifaces;
 
 use cidr::IpCidr;
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv6Addr};
@@ -23,12 +23,12 @@ pub enum AddressFamily {
 
 pub struct RecordState {
     server: Rc<RefCell<dns::Server>>,
-    hostname: Rc<String>,
+    name: Rc<String>,
     neighbors: Rc<HashMap<String, Ipv6Addr>>,
 
     addr: Option<IpAddr>,
     ttl: u32,
-    zone: Rc<String>,
+    zone: Option<Rc<String>>,
     scope: IpCidr,
     dirty: bool,
     update_tried: Option<Instant>,
@@ -58,14 +58,22 @@ impl RecordState {
             _ => panic!("scope {} doesn't match address family {:?}", scope, af),
         }
 
+        let zone = match update_task.zone {
+            Some(zone) => Some(Rc::new(zone)),
+            None => {
+                warn!("Your configuration misses the `zone` parameter. This field will be mandatory in a future release.");
+                None
+            }
+        };
+
         RecordState {
             server,
-            hostname: Rc::new(update_task.name.clone()),
+            name: Rc::new(update_task.name.clone()),
             neighbors: Rc::new(update_task.neighbors.unwrap_or_default()),
 
             addr: None,
             ttl: update_task.ttl.unwrap_or(0),
-            zone: Rc::new(update_task.zone),
+            zone: zone,
             scope,
             dirty: false,
             update_tried: None,
@@ -123,10 +131,10 @@ impl RecordState {
         self.update_tried = Some(Instant::now());
 
         let addr = self.addr.unwrap();
-        if let Err(e) = self.update_addr(&self.hostname.clone(), &addr).await {
+        if let Err(e) = self.update_addr(&self.name.clone(), &addr).await {
             error!(
                 "Error updating {} to {}: {}",
-                self.hostname,
+                self.name,
                 self.addr.unwrap(),
                 e
             );
@@ -181,7 +189,12 @@ impl RecordState {
             }
         }
 
-        server.update(name, *addr, &self.zone, self.ttl).await
+        let zone = match &self.zone {
+            Some(zone) => Some(zone.as_str()),
+            None => None,
+        };
+
+        server.update(name, *addr, zone, self.ttl).await
     }
 }
 /// # Errors

@@ -60,7 +60,7 @@ pub struct UpdateTask {
     pub key: String,
     pub name: String,
     pub interface: String,
-    pub zone: String,
+    pub zone: Option<String>,
     pub ttl: Option<u32>,
     pub scope: Option<String>,
     pub neighbors: Option<HashMap<String, Ipv6Addr>>,

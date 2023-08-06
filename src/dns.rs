@@ -77,7 +77,7 @@ impl Server {
     ///
     /// Will return `Err` in case
     ///
-    /// - `hostname` can not be parsed into a UTF-8 string.
+    /// - `name` can not be parsed into a UTF-8 string.
     /// - deletion of resource record set failed.
     /// - appending the new record failed.
     ///
@@ -86,7 +86,7 @@ impl Server {
         &mut self,
         name: &str,
         addr: IpAddr,
-        zone: &str,
+        zone: Option<&str>,
         ttl: u32,
     ) -> Result<(), String> {
         let rdata = match addr {
@@ -94,7 +94,12 @@ impl Server {
             IpAddr::V6(addr) => RData::AAAA(addr),
         };
         let name = Name::from_str(name)?;
-        let zone = Name::from_str(zone)?;
+
+        // This is introduced to deal with legacy configurations without a `zone` set.
+        let zone = match zone {
+            Some(zone) => Name::from_str(zone)?,
+            None => name.base_name(),
+        };
         let rec = Record::from_rdata(name.clone(), ttl, rdata);
         let query = self.client.delete_rrset(rec.clone(), zone.clone());
         let response = query.await.map_err(|e| format!("{e}"))?;
