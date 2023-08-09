@@ -4,13 +4,15 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::UdpSocket;
-use trust_dns_client::client::{AsyncClient, ClientHandle};
+use trust_dns_client::client::{AsyncClient, ClientHandle, Signer};
 use trust_dns_client::op::{Message, MessageFinalizer, MessageVerifier, ResponseCode};
 use trust_dns_client::proto::error::ProtoResult;
+use trust_dns_client::rr::dnssec::tsig::TSigner;
+use trust_dns_client::rr::rdata::tsig::TsigAlgorithm;
 use trust_dns_client::rr::{DNSClass, Name, RData, Record, RecordType};
 use trust_dns_client::udp::UdpClientStream;
 
-mod tsig;
+//mod tsig;
 
 pub struct Server {
     client: AsyncClient,
@@ -26,12 +28,23 @@ impl Server {
     /// - Establishing a connection to the DNS endpoint failed.
     ///
     pub async fn new(addr: IpAddr, key: &crate::config::TsigKey) -> Self {
-        let alg = tsig::Algorithm::from_name(&Name::from_ascii(&key.alg).unwrap()).unwrap();
-        let signer = Signer {
-            key: tsig::Key::new(Name::from_str(&key.name).unwrap(), alg, key.get_secret()),
-        };
+        //let alg = tsig::Algorithm::from_name(&Name::from_ascii(&key.alg).unwrap()).unwrap();
+        // TODO: Why from DNS name?
+        let alg = TsigAlgorithm::from_name(Name::from_str(&key.alg).unwrap());
 
-        let stream = UdpClientStream::<UdpSocket, Signer>::with_timeout_and_signer(
+        //let signer = Signer {
+        //    key: tsig::Key::new(Name::from_str(&key.name).unwrap(), alg, key.get_secret()),
+        //};
+
+        let signer = TSigner::new(
+            key.get_secret(),
+            alg,
+            Name::from_str(&key.name).unwrap(),
+            300,
+        )
+        .unwrap();
+
+        let stream = UdpClientStream::<UdpSocket, TSigner>::with_timeout_and_signer(
             (addr, 53).into(),
             Duration::from_secs(3),
             Some(Arc::new(signer)),
@@ -118,17 +131,17 @@ impl Server {
     }
 }
 
-struct Signer {
-    key: tsig::Key,
-}
-
-impl MessageFinalizer for Signer {
-    fn finalize_message(
-        &self,
-        message: &Message,
-        current_time: u32,
-    ) -> ProtoResult<(Vec<Record>, Option<MessageVerifier>)> {
-        let record = tsig::create_signature(message, current_time.into(), &self.key).unwrap();
-        Ok((vec![record], None))
-    }
-}
+//struct Signer {
+//    key: tsig::Key,
+//}
+//
+//impl MessageFinalizer for Signer {
+//    fn finalize_message(
+//        &self,
+//        message: &Message,
+//        current_time: u32,
+//    ) -> ProtoResult<(Vec<Record>, Option<MessageVerifier>)> {
+//        let record = tsig::create_signature(message, current_time.into(), &self.key).unwrap();
+//        Ok((vec![record], None))
+//    }
+//}
