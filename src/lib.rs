@@ -23,7 +23,7 @@ pub enum AddressFamily {
 
 pub struct RecordState {
     server: Rc<RefCell<dns::Server>>,
-    name: Rc<String>,
+    name: Option<Rc<String>>,
     neighbors: Rc<HashMap<String, Ipv6Addr>>,
 
     addr: Option<IpAddr>,
@@ -72,9 +72,15 @@ impl RecordState {
         //    }
         //};
 
+        let name = if let Some(name) = update_task.name {
+            Some(Rc::new(name.clone()))
+        } else {
+            None
+        };
+
         RecordState {
             server,
-            name: Rc::new(update_task.name.clone()),
+            name,
             neighbors: Rc::new(update_task.neighbors.unwrap_or_default()),
 
             addr: None,
@@ -137,16 +143,18 @@ impl RecordState {
         self.update_tried = Some(Instant::now());
 
         let addr = self.addr.unwrap();
-        if let Err(e) = self.update_addr(&self.name.clone(), &addr).await {
-            error!(
-                "Error updating {} to {}: {}",
-                self.name,
-                self.addr.unwrap(),
-                e
-            );
-            // try again later
-            self.dirty = true;
-            return;
+        if let Some(name) = &self.name.clone() {
+            if let Err(e) = self.update_addr(name, &addr).await {
+                error!(
+                    "Error updating {} to {}: {}",
+                    name,
+                    self.addr.unwrap(),
+                    e
+                );
+                // try again later
+                self.dirty = true;
+                return;
+            }
         }
 
         if let Some(IpAddr::V6(addr)) = self.addr {
