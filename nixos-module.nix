@@ -1,5 +1,8 @@
 { self }:
-{ pkgs, config, lib, ... }: {
+
+{ pkgs, config, lib, ... }: let
+  cfg = config.services.ifdyndnsd;
+in {
   options.services.ifdyndnsd = with lib; {
     enable = mkOption {
       default = false;
@@ -7,6 +10,11 @@
     };
     config = mkOption {
       type = types.lines;
+    };
+    configFile = mkOption {
+      type = types.path;
+      default = builtins.toFile "ifdyndnsd.toml" cfg.config;
+      defaultText = ''builtins.toFile "ifdyndnsd.toml" cfg.config;'';
     };
     package = mkOption {
       type = types.package;
@@ -26,13 +34,10 @@
     };
   };
 
-  config = let
-    cfg = config.services.ifdyndnsd;
-    configFile = builtins.toFile "ifdyndnsd.toml" cfg.config;
-  in lib.mkIf cfg.enable {
+  config = lib.mkIf cfg.enable {
     users.users.${cfg.user} = {
       isSystemUser = true;
-      group = cfg.group;
+      inherit (cfg) group;
     };
     users.groups.${cfg.group} = { };
 
@@ -41,7 +46,7 @@
       environment.RUST_LOG = "ifdyndnsd=${cfg.logLevel}";
       serviceConfig = {
         Type = "simple";
-        ExecStart = "${cfg.package}/bin/ifdyndnsd ${configFile}";
+        ExecStart = "${cfg.package}/bin/ifdyndnsd ${cfg.configFile}";
         User = cfg.user;
         Group = cfg.group;
         Restart = "always";
