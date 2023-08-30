@@ -5,7 +5,9 @@
       default = false;
       type = types.bool;
     };
-    config = mkOption { type = types.str; };
+    config = mkOption {
+      type = types.lines;
+    };
     package = mkOption {
       type = types.package;
       default = self.packages.${pkgs.system}.ifdyndnsd;
