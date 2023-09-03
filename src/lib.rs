@@ -72,11 +72,7 @@ impl RecordState {
         //    }
         //};
 
-        let name = if let Some(name) = update_task.name {
-            Some(Rc::new(name.clone()))
-        } else {
-            None
-        };
+        let name = update_task.name.map(|name| Rc::new(name.clone()));
 
         RecordState {
             server,
@@ -158,7 +154,7 @@ impl RecordState {
         }
 
         if let Some(IpAddr::V6(addr)) = self.addr {
-            for (neighbor_name, neighbor_addr) in self.neighbors.clone().iter() {
+            for (neighbor_name, neighbor_addr) in &*self.neighbors.clone() {
                 let net_segs = addr.segments();
                 let host_segs = neighbor_addr.segments();
                 let addr = Ipv6Addr::new(
@@ -260,7 +256,7 @@ pub async fn run(config_file: &str) -> Result<(), String> {
             Ok(Some((iface, addr))) => {
                 trace!("interface {}: address {}", iface, addr);
                 if let Some(states) = iface_states.get_mut(&iface) {
-                    for record_state in states.iter_mut() {
+                    for record_state in &mut *states {
                         if record_state.set_address(addr) {
                             debug!("interface {}: new address {}", iface, addr);
                             interval = IDLE_TIMEOUT;
@@ -278,7 +274,7 @@ pub async fn run(config_file: &str) -> Result<(), String> {
                 debug!("IDLE_TIMEOUT");
 
                 'send_update: for states in iface_states.values_mut() {
-                    for state in states.iter_mut() {
+                    for state in &mut *states {
                         if state.can_update() {
                             state.update().await;
                             break 'send_update;
@@ -288,7 +284,7 @@ pub async fn run(config_file: &str) -> Result<(), String> {
 
                 /* if NEVER_TIMEOUT was set, find a smaller timeout to retry an update */
                 for states in iface_states.values() {
-                    for state in states.iter() {
+                    for state in states {
                         if let Some(state_timeout) = state.next_timeout() {
                             let now = Instant::now();
                             if state_timeout <= now {
