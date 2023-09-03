@@ -58,7 +58,7 @@ impl TsigKey {
 #[derive(Debug, Deserialize)]
 pub struct UpdateTask {
     pub key: String,
-    pub name: String,
+    pub name: Option<String>,
     pub interface: String,
     pub zone: Option<String>,
     pub ttl: Option<u32>,
