@@ -141,12 +141,7 @@ impl RecordState {
         let addr = self.addr.unwrap();
         if let Some(name) = &self.name.clone() {
             if let Err(e) = self.update_addr(name, &addr).await {
-                error!(
-                    "Error updating {} to {}: {}",
-                    name,
-                    self.addr.unwrap(),
-                    e
-                );
+                error!("Error updating {} to {}: {}", name, self.addr.unwrap(), e);
                 // try again later
                 self.dirty = true;
                 return;
