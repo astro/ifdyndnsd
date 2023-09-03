@@ -18,7 +18,7 @@ in {
     };
     package = mkOption {
       type = types.package;
-      default = self.packages.${pkgs.system}.ifdyndnsd;
+      default = self.packages.${pkgs.stdenv.hostPlatform.system}.ifdyndnsd;
     };
     user = mkOption {
       type = types.str;
