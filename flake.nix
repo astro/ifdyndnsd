@@ -64,7 +64,7 @@
           packages = [ pkgs.cargo-edit ];
         };
       }) // {
-        overlay = final: prev: { ifdyndnsd = self.packages.${prev.system}; };
+        overlay = final: prev: { inherit (self.packages.${prev.stdenv.system}) ifdyndnsd; };
 
         nixosModule = import ./nixos-module.nix { inherit self; };
       };
