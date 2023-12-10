@@ -230,14 +230,14 @@ pub async fn run(config_file: &str) -> Result<(), String> {
         let server = servers.get(&a.key).unwrap();
         iface_states
             .entry(a.interface.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(RecordState::new(a, server.clone(), AddressFamily::IPv4));
     }
     for aaaa in config.aaaa.unwrap_or_default() {
         let server = servers.get(&aaaa.key).unwrap();
         iface_states
             .entry(aaaa.interface.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(RecordState::new(aaaa, server.clone(), AddressFamily::IPv6));
     }
 
