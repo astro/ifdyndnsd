@@ -4,12 +4,12 @@ pub mod ifaces;
 
 use cidr::IpCidr;
 use log::{debug, error, info, trace, warn};
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv6Addr};
 use std::rc::Rc;
 use std::str::FromStr;
 use std::time::{Duration, Instant};
+use tokio::sync::Mutex;
 use tokio::time::timeout;
 use trust_dns_client::rr::RecordType;
 
@@ -22,7 +22,7 @@ pub enum AddressFamily {
 }
 
 pub struct RecordState {
-    server: Rc<RefCell<dns::Server>>,
+    server: Rc<Mutex<dns::Server>>,
     name: Option<Rc<String>>,
     neighbors: Rc<HashMap<String, Ipv6Addr>>,
 
@@ -41,7 +41,7 @@ impl RecordState {
     /// Classless Inter-Domain Routing (CIDR) address.
     pub fn new(
         update_task: config::UpdateTask,
-        server: Rc<RefCell<dns::Server>>,
+        server: Rc<Mutex<dns::Server>>,
         af: AddressFamily,
     ) -> Self {
         let scope = IpCidr::from_str(update_task.scope.as_deref().unwrap_or(match af {
@@ -180,7 +180,7 @@ impl RecordState {
             IpAddr::V6(_) => RecordType::AAAA,
         };
 
-        let mut server = self.server.borrow_mut();
+        let mut server = self.server.lock().await;
         match server.query(name, record_type).await {
             Ok(addrs) if addrs.len() == 1 && addrs[0] == *addr => {
                 info!("No address change for {} ({} == {:?})", name, addr, addrs);
@@ -222,7 +222,7 @@ pub async fn run(config_file: &str) -> Result<(), String> {
     for (name, key) in &keys {
         servers.insert(
             name,
-            Rc::new(RefCell::new(dns::Server::new(key.server, key).await)),
+            Rc::new(Mutex::new(dns::Server::new(key.server, key).await)),
         );
     }
     let mut iface_states = HashMap::<String, Vec<RecordState>>::new();
