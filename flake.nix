@@ -61,7 +61,7 @@
         devShell = pkgs.mkShell {
           nativeBuildInputs = with defaultPackage;
             nativeBuildInputs ++ buildInputs;
-          packages = [ pkgs.cargo-edit ];
+          packages = with pkgs; [ cargo-edit rust-analyzer ];
         };
       }) // {
         overlay = final: prev: { inherit (self.packages.${prev.stdenv.system}) ifdyndnsd; };
