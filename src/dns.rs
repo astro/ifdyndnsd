@@ -4,12 +4,12 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::UdpSocket;
-use trust_dns_client::client::{AsyncClient, ClientHandle};
-use trust_dns_client::op::ResponseCode;
-use trust_dns_client::rr::dnssec::tsig::TSigner;
-use trust_dns_client::rr::rdata::tsig::TsigAlgorithm;
-use trust_dns_client::rr::{DNSClass, Name, RData, Record, RecordType};
-use trust_dns_client::udp::UdpClientStream;
+use hickory_client::client::{AsyncClient, ClientHandle};
+use hickory_client::op::ResponseCode;
+use hickory_client::proto::rr::dnssec::tsig::TSigner;
+use hickory_client::rr::rdata::{A, AAAA, tsig::TsigAlgorithm};
+use hickory_client::rr::{DNSClass, Name, RData, Record, RecordType};
+use hickory_client::udp::UdpClientStream;
 
 pub struct Server {
     client: AsyncClient,
@@ -68,8 +68,8 @@ impl Server {
             .answers()
             .iter()
             .filter_map(|answer| match answer.data() {
-                Some(RData::A(addr)) => Some((*addr).into()),
-                Some(RData::AAAA(addr)) => Some((*addr).into()),
+                Some(RData::A(addr)) => Some(addr.0.into()),
+                Some(RData::AAAA(addr)) => Some(addr.0.into()),
                 _ => None,
             })
             .collect::<Vec<_>>();
@@ -93,8 +93,8 @@ impl Server {
         ttl: u32,
     ) -> Result<(), String> {
         let rdata = match addr {
-            IpAddr::V4(addr) => RData::A(addr),
-            IpAddr::V6(addr) => RData::AAAA(addr),
+            IpAddr::V4(addr) => RData::A(A(addr)),
+            IpAddr::V6(addr) => RData::AAAA(AAAA(addr)),
         };
         let name = Name::from_str(name)?;
 

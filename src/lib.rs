@@ -11,7 +11,7 @@ use std::str::FromStr;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 use tokio::time::timeout;
-use trust_dns_client::rr::RecordType;
+use hickory_client::rr::RecordType;
 
 pub const RETRY_INTERVAL: u64 = 60;
 
