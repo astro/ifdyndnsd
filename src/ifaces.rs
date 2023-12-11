@@ -5,12 +5,11 @@ use futures::{
 use log::{debug, error, trace};
 use netlink_packet_core::NetlinkPayload;
 use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::IpAddr;
 
 use netlink_packet_route::{
-    constants::IFA_F_TEMPORARY, rtnl::address::nlas::Nla as AddrNla,
-    rtnl::link::nlas::Nla as LinkNla, AddressMessage, LinkMessage, RtnlMessage,
+    address::{AddressMessage, AddressHeaderFlag, AddressAttribute},
+    link::{LinkMessage, LinkAttribute}, RouteNetlinkMessage,
 };
 
 use netlink_sys::{AsyncSocket, SocketAddr};
@@ -93,16 +92,16 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
     while let Some((message, _)) = messages.next().await {
         trace!("netlink message: {:?}", message);
         match message.payload {
-            NetlinkPayload::InnerMessage(RtnlMessage::NewLink(m)) => {
+            NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewLink(m)) => {
                 let index = m.header.index;
                 if let Some(name) = link_message_name(&m) {
                     interface_names.insert(index, name.to_string());
                 }
             }
-            NetlinkPayload::InnerMessage(RtnlMessage::DelLink(m)) => {
+            NetlinkPayload::InnerMessage(RouteNetlinkMessage::DelLink(m)) => {
                 interface_names.remove(&m.header.index);
             }
-            NetlinkPayload::InnerMessage(RtnlMessage::NewAddress(m)) => {
+            NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewAddress(m)) => {
                 if let Some(name) = interface_names.get(&m.header.index) {
                     if let Some(addr) = message_local_addr(&m) {
                         tx.send((name.clone(), addr)).await.unwrap();
@@ -120,55 +119,37 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
 }
 
 fn message_local_addr(m: &AddressMessage) -> Option<IpAddr> {
-    let mut addr_buf = None;
-    let mut local_buf = None;
-    let mut flags = None;
-
-    for nla in &m.nlas {
-        match nla {
-            AddrNla::Address(a) => addr_buf = Some(a.clone()),
-            AddrNla::Local(a) => local_buf = Some(a.clone()),
-            AddrNla::Flags(f) => flags = Some(f),
-            _ => {}
-        }
+    // Ignore IPv6 temp_addrs
+    let is_temporary = m.header.flags.contains(&AddressHeaderFlag::Secondary);
+    if is_temporary {
+        return None;
     }
-    match (
-        addr_buf.and_then(buf_to_addr),
-        local_buf.and_then(buf_to_addr),
-        flags,
-    ) {
-        (_, _, Some(flags)) if flags & IFA_F_TEMPORARY != 0 =>
-        // ignore temporary addresses
-        {
+
+    // Get the local address for a pointopoint link
+    if let Some(local) = m.attributes.iter()
+        .find_map(|a| if let AddressAttribute::Local(addr) = a {
+            Some(*addr)
+        } else {
             None
-        }
-        (_, Some(addr), _) =>
-        // prefer local address in case of pointopoint ifaces
-        {
-            Some(addr)
-        }
-        (Some(addr), _, _) => Some(addr),
-        (_, _, _) => None,
+        })
+    {
+        return Some(local);
     }
-}
 
-fn buf_to_addr(addr: Vec<u8>) -> Option<IpAddr> {
-    match addr.len() {
-        4 => <[u8; 4]>::try_from(addr)
-            .map(Ipv4Addr::from)
-            .map(IpAddr::V4)
-            .ok(),
-        16 => <[u8; 16]>::try_from(addr)
-            .map(Ipv6Addr::from)
-            .map(IpAddr::V6)
-            .ok(),
-        _ => None,
-    }
+    // Get interfaces address
+    m.attributes.iter()
+        .find_map(|a| if let AddressAttribute::Address(addr) = a {
+            Some(*addr)
+        } else {
+            None
+        })
 }
 
 fn link_message_name(m: &LinkMessage) -> Option<&String> {
-    m.nlas.iter().find_map(|nla| match nla {
-        LinkNla::IfName(name) => Some(name),
-        _ => None,
-    })
+    m.attributes.iter()
+        .find_map(|a| if let LinkAttribute::IfName(name) = a {
+            Some(name)
+        } else {
+            None
+        })
 }
