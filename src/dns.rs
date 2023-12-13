@@ -1,15 +1,15 @@
+use hickory_client::client::{AsyncClient, ClientHandle};
+use hickory_client::op::ResponseCode;
+use hickory_client::proto::rr::dnssec::tsig::TSigner;
+use hickory_client::rr::rdata::{tsig::TsigAlgorithm, A, AAAA};
+use hickory_client::rr::{DNSClass, Name, RData, Record, RecordType};
+use hickory_client::udp::UdpClientStream;
 use log::info;
 use std::net::IpAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::UdpSocket;
-use hickory_client::client::{AsyncClient, ClientHandle};
-use hickory_client::op::ResponseCode;
-use hickory_client::proto::rr::dnssec::tsig::TSigner;
-use hickory_client::rr::rdata::{A, AAAA, tsig::TsigAlgorithm};
-use hickory_client::rr::{DNSClass, Name, RData, Record, RecordType};
-use hickory_client::udp::UdpClientStream;
 
 pub struct Server {
     client: AsyncClient,

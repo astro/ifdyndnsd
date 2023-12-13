@@ -3,6 +3,7 @@ pub mod dns;
 pub mod ifaces;
 
 use cidr::IpCidr;
+use hickory_client::rr::RecordType;
 use log::{debug, error, info, trace, warn};
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv6Addr};
@@ -11,7 +12,6 @@ use std::str::FromStr;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 use tokio::time::timeout;
-use hickory_client::rr::RecordType;
 
 pub const RETRY_INTERVAL: u64 = 60;
 

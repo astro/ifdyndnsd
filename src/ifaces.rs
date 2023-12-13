@@ -8,8 +8,9 @@ use std::collections::HashMap;
 use std::net::IpAddr;
 
 use netlink_packet_route::{
-    address::{AddressMessage, AddressHeaderFlag, AddressAttribute},
-    link::{LinkMessage, LinkAttribute}, RouteNetlinkMessage,
+    address::{AddressAttribute, AddressHeaderFlag, AddressMessage},
+    link::{LinkAttribute, LinkMessage},
+    RouteNetlinkMessage,
 };
 
 use netlink_sys::{AsyncSocket, SocketAddr};
@@ -126,30 +127,32 @@ fn message_local_addr(m: &AddressMessage) -> Option<IpAddr> {
     }
 
     // Get the local address for a pointopoint link
-    if let Some(local) = m.attributes.iter()
-        .find_map(|a| if let AddressAttribute::Local(addr) = a {
+    if let Some(local) = m.attributes.iter().find_map(|a| {
+        if let AddressAttribute::Local(addr) = a {
             Some(*addr)
         } else {
             None
-        })
-    {
+        }
+    }) {
         return Some(local);
     }
 
     // Get interfaces address
-    m.attributes.iter()
-        .find_map(|a| if let AddressAttribute::Address(addr) = a {
+    m.attributes.iter().find_map(|a| {
+        if let AddressAttribute::Address(addr) = a {
             Some(*addr)
         } else {
             None
-        })
+        }
+    })
 }
 
 fn link_message_name(m: &LinkMessage) -> Option<&String> {
-    m.attributes.iter()
-        .find_map(|a| if let LinkAttribute::IfName(name) = a {
+    m.attributes.iter().find_map(|a| {
+        if let LinkAttribute::IfName(name) = a {
             Some(name)
         } else {
             None
-        })
+        }
+    })
 }
