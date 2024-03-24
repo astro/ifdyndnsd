@@ -8,11 +8,11 @@
         "rust-analyzer-src": "rust-analyzer-src"
       },
       "locked": {
-        "lastModified": 1701930186,
-        "narHash": "sha256-t9uIiU1fE7VXi3t460iOuAUW8Ece9mowRKva1aw48zI=",
+        "lastModified": 1711088506,
+        "narHash": "sha256-USdlY7Tx2oJWqFBpp10+03+h7eVhpkQ4s9t1ERjeIJE=",
         "owner": "nix-community",
         "repo": "fenix",
-        "rev": "aeb764a8e4c16da3f36b200a302552d8e457b9f4",
+        "rev": "85f4139f3c092cf4afd9f9906d7ed218ef262c97",
         "type": "github"
       },
       "original": {
@@ -43,11 +43,12 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1701539137,
-        "narHash": "sha256-nVO/5QYpf1GwjvtpXhyxx5M3U/WN0MwBro4Lsk+9mL0=",
-        "path": "/nix/store/chi01x4fh8hx7wwh0rqd7m1c8583iyhv-source",
-        "rev": "933d7dc155096e7575d207be6fb7792bc9f34f6d",
-        "type": "path"
+        "lastModified": 1711200738,
+        "narHash": "sha256-dkJmk/ET/tRV4007O6kU101UEg1svUwiyk/zEEX9Tdg=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "20bc93ca7b2158ebc99b8cef987a2173a81cde35",
+        "type": "github"
       },
       "original": {
         "id": "nixpkgs",
@@ -65,11 +66,11 @@
     "rust-analyzer-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1701896510,
-        "narHash": "sha256-6gL62tCN5boWEl3ZTOxMOTrNtfZSqodDiAEELzvSYA4=",
+        "lastModified": 1711052942,
+        "narHash": "sha256-lLsAhLgm/Nbin41wdfGKU7Rgd6ONBxYCUAMv53NXPjo=",
         "owner": "rust-lang",
         "repo": "rust-analyzer",
-        "rev": "6557151dca7e76832ff770caf1293f3062ea98e9",
+        "rev": "7ef7f442fc34b5eadb1c6ad6433bd6d0c51b056b",
         "type": "github"
       },
       "original": {
@@ -99,11 +100,11 @@
         "systems": "systems"
       },
       "locked": {
-        "lastModified": 1701680307,
-        "narHash": "sha256-kAuep2h5ajznlPMD9rnQyffWG8EM/C73lejGofXvdM8=",
+        "lastModified": 1710146030,
+        "narHash": "sha256-SZ5L6eA7HJ/nmkzGG7/ISclqe6oZdOZTNoesiInkXPQ=",
         "owner": "numtide",
         "repo": "flake-utils",
-        "rev": "4022d587cbbfd70fe950c1e2083a02621806a725",
+        "rev": "b1d9ab70662946ef0850d488da1c9019f3a9752a",
         "type": "github"
       },
       "original": {
