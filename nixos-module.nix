@@ -1,5 +1,3 @@
-{ self }:
-
 { pkgs, config, lib, ... }: let
   cfg = config.services.ifdyndnsd;
 in {
@@ -18,7 +16,7 @@ in {
     };
     package = mkOption {
       type = types.package;
-      default = self.packages.${pkgs.stdenv.hostPlatform.system}.ifdyndnsd;
+      default = pkgs.ifdyndnsd;
     };
     user = mkOption {
       type = types.str;

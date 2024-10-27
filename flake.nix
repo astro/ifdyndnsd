@@ -66,6 +66,12 @@
       }) // {
         overlay = final: prev: { inherit (self.packages.${prev.stdenv.system}) ifdyndnsd; };
 
-        nixosModule = import ./nixos-module.nix { inherit self; };
+        nixosModule = {
+          imports = [ ./nixos-module.nix ];
+
+          nixpkgs.overlays = [
+            self.overlay
+          ];
+        };
       };
 }
