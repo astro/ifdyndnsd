@@ -4,7 +4,7 @@
     naersk.url = "github:nmattia/naersk";
     naersk.inputs.nixpkgs.follows = "nixpkgs";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    fenix.url = "github:nix-community/fenix";
+    fenix.url = "github:nix-community/fenix/monthly";
     fenix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
