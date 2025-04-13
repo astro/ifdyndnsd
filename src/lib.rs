@@ -165,10 +165,7 @@ impl RecordState {
                 .into();
 
                 if let Err(e) = self.update_addr(neighbor_name, &addr).await {
-                    error!(
-                        "Error updating neighbor {} to {}: {}",
-                        neighbor_addr, addr, e
-                    );
+                    error!("Error updating neighbor {neighbor_addr} to {addr}: {e}");
                 }
             }
         }
@@ -183,14 +180,14 @@ impl RecordState {
         let mut server = self.server.lock().await;
         match server.query(name, record_type).await {
             Ok(addrs) if addrs.len() == 1 && addrs[0] == *addr => {
-                info!("No address change for {} ({} == {:?})", name, addr, addrs);
+                info!("No address change for {name} ({addr} == {addrs:?})");
                 return Ok(());
             }
             Ok(addrs) => {
-                info!("Outdated address for {}: {:?}", name, addrs);
+                info!("Outdated address for {name}: {addrs:?}");
             }
             Err(e) => {
-                error!("Error querying for {} {}: {}", record_type, name, e);
+                error!("Error querying for {record_type} {name}: {e}");
             }
         }
 
@@ -246,14 +243,14 @@ pub async fn run(config_file: &str) -> Result<(), String> {
     let mut addr_updates = ifaces::start();
 
     loop {
-        trace!("recv for {:?}", interval);
+        trace!("recv for {interval:?}");
         match timeout(interval, addr_updates.recv()).await {
             Ok(Some((iface, addr))) => {
-                trace!("interface {}: address {}", iface, addr);
+                trace!("interface {iface}: address {addr}");
                 if let Some(states) = iface_states.get_mut(&iface) {
                     for record_state in &mut *states {
                         if record_state.set_address(addr) {
-                            debug!("interface {}: new address {}", iface, addr);
+                            debug!("interface {iface}: new address {addr}");
                             interval = IDLE_TIMEOUT;
                         }
                     }

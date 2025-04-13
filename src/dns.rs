@@ -84,7 +84,6 @@ impl Server {
     /// - deletion of resource record set failed.
     /// - appending the new record failed.
     ///
-
     pub async fn update(
         &mut self,
         name: &str,
@@ -111,7 +110,7 @@ impl Server {
             return Err(format!("Response code: {}", response.response_code()));
         }
         let query = self.client.append(rec, zone, false);
-        info!("DNS update: {} {}", name, addr);
+        info!("DNS update: {name} {addr}");
         let response = query.await.map_err(|e| format!("{e}"))?;
 
         if response.response_code() != ResponseCode::NoError {
