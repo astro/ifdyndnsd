@@ -31,7 +31,7 @@ pub fn start() -> Receiver<(String, IpAddr)> {
         loop {
             match run(&mut tx).await {
                 Ok(()) => error!("nfnetlink: restarting listener"),
-                Err(e) => error!("nfnetlink error: {}", e),
+                Err(e) => error!("nfnetlink error: {e}"),
             }
         }
     });
@@ -91,7 +91,7 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
     }
 
     while let Some((message, _)) = messages.next().await {
-        trace!("netlink message: {:?}", message);
+        trace!("netlink message: {message:?}");
         match message.payload {
             NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewLink(m)) => {
                 let index = m.header.index;
