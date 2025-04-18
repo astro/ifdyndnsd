@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::net::IpAddr;
 
 use netlink_packet_route::{
-    address::{AddressAttribute, AddressHeaderFlag, AddressMessage},
+    address::{AddressAttribute, AddressHeaderFlags, AddressMessage},
     link::{LinkAttribute, LinkMessage},
     RouteNetlinkMessage,
 };
@@ -121,7 +121,7 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
 
 fn message_local_addr(m: &AddressMessage) -> Option<IpAddr> {
     // Ignore IPv6 temp_addrs
-    let is_temporary = m.header.flags.contains(&AddressHeaderFlag::Secondary);
+    let is_temporary = m.header.flags.contains(AddressHeaderFlags::Secondary);
     if is_temporary {
         return None;
     }
