@@ -1,17 +1,27 @@
 { pkgs, config, lib, ... }: let
   cfg = config.services.ifdyndnsd;
+
 in {
   options.services.ifdyndnsd = with lib; {
     enable = mkOption {
       default = false;
       type = types.bool;
     };
-    config = mkOption {
-      type = types.lines;
+    config.keys = mkOption {
+      type = with types; attrsOf (attrsOf str);
+      default = {};
+    };
+    config.a = mkOption {
+      type = with types; listOf (attrsOf (either str int));
+      default = [];
+    };
+    config.aaaa = mkOption {
+      type = with types; listOf (attrsOf (either str int));
+      default = [];
     };
     configFile = mkOption {
       type = types.path;
-      default = builtins.toFile "ifdyndnsd.toml" cfg.config;
+      default = pkgs.writers.writeTOML "ifdyndnsd.toml" cfg.config;
       defaultText = ''builtins.toFile "ifdyndnsd.toml" cfg.config;'';
     };
     package = mkOption {
