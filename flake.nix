@@ -44,7 +44,16 @@
         };
         defaultPackage = packages.ifdyndnsd;
 
-        checks = packages;
+        checks = packages // {
+          nixos-test =
+            let
+              pkgs = import nixpkgs {
+                inherit system;
+                overlays = [ self.overlay ];
+              };
+            in
+              pkgs.callPackage ./nixos-test.nix {};
+        };
 
         # `nix run`
         apps.ifdyndnsd = utils.lib.mkApp { drv = packages.ifdyndnsd; };
