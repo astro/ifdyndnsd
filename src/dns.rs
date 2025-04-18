@@ -1,18 +1,18 @@
-use hickory_client::client::{AsyncClient, ClientHandle};
-use hickory_client::op::ResponseCode;
-use hickory_client::proto::rr::dnssec::tsig::TSigner;
-use hickory_client::rr::rdata::{tsig::TsigAlgorithm, A, AAAA};
-use hickory_client::rr::{DNSClass, Name, RData, Record, RecordType};
-use hickory_client::udp::UdpClientStream;
+use hickory_client::client::{Client, ClientHandle};
+use hickory_client::proto::op::response_code::ResponseCode;
+use hickory_client::proto::dnssec::tsig::TSigner;
+use hickory_client::proto::dnssec::rdata::tsig::TsigAlgorithm;
+use hickory_client::proto::rr::rdata::{A, AAAA};
+use hickory_client::proto::rr::{DNSClass, Name, RData, Record, record_type::RecordType};
+use hickory_client::proto::udp::UdpClientStream;
 use log::info;
 use std::net::IpAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::net::UdpSocket;
 
 pub struct Server {
-    client: AsyncClient,
+    client: Client,
 }
 
 impl Server {
@@ -34,13 +34,16 @@ impl Server {
         )
         .unwrap();
 
-        let stream = UdpClientStream::<UdpSocket, TSigner>::with_timeout_and_signer(
-            (addr, 53).into(),
-            Duration::from_secs(3),
-            Some(Arc::new(signer)),
-        );
-        let client = AsyncClient::connect(stream);
-        let (mut client, bg) = client.await.unwrap();
+        let stream = UdpClientStream::builder(
+            (addr, 53).into(), hickory_client::proto::runtime::TokioRuntimeProvider::default()
+        ).with_timeout(
+            Some(Duration::from_secs(3))
+        ).with_signer(
+            Some(Arc::new(signer))
+        ).build();
+        let (mut client, bg) = Client::connect(stream)
+            .await
+            .unwrap();
         client.disable_edns();
 
         tokio::spawn(bg);
@@ -68,8 +71,8 @@ impl Server {
             .answers()
             .iter()
             .filter_map(|answer| match answer.data() {
-                Some(RData::A(addr)) => Some(addr.0.into()),
-                Some(RData::AAAA(addr)) => Some(addr.0.into()),
+                RData::A(addr) => Some(addr.0.into()),
+                RData::AAAA(addr) => Some(addr.0.into()),
                 _ => None,
             })
             .collect::<Vec<_>>();

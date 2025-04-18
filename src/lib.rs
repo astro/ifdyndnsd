@@ -3,7 +3,7 @@ pub mod dns;
 pub mod ifaces;
 
 use cidr::IpCidr;
-use hickory_client::rr::RecordType;
+use hickory_client::proto::rr::record_type::RecordType;
 use log::{debug, error, info, trace, warn};
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv6Addr};
