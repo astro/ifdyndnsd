@@ -25,7 +25,13 @@
           version = (
             pkgs.lib.importTOML ./Cargo.toml
           ).package.version + "-" + self.lastModifiedDate;
-          src = ./.;
+          # Filter src to avoid unnecessary rebuilds
+          src = pkgs.runCommand "ifdyndnsd-src" {} ''
+            mkdir $out
+            ln -s ${./src} $out/src
+            ln -s ${./Cargo.toml} $out/Cargo.toml
+            ln -s ${./Cargo.lock} $out/Cargo.lock
+          '';
           cargoLock.lockFile = ./Cargo.lock;
           nativeBuildInputs = with pkgs; [ clippy rustfmt ];
           postCheck = ''
