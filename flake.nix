@@ -1,14 +1,10 @@
 {
   inputs = {
     utils.url = "github:numtide/flake-utils";
-    naersk.url = "github:nmattia/naersk";
-    naersk.inputs.nixpkgs.follows = "nixpkgs";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    fenix.url = "github:nix-community/fenix/monthly";
-    fenix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, utils, naersk, fenix, }:
+  outputs = { self, nixpkgs, utils }:
     let
       systems = [
         "i686-linux"
@@ -21,34 +17,24 @@
     in utils.lib.eachSystem systems (system:
       let
         pkgs = nixpkgs.legacyPackages."${system}";
-        rust = fenix.packages.${system}.stable.withComponents [
-          "cargo"
-          "rustc"
-          "rustfmt"
-          "clippy"
-        ];
 
-        # Override the version used in naersk
-        naersk-lib = naersk.lib."${system}".override {
-          cargo = rust;
-          rustc = rust;
-        };
       in rec {
         # `nix build`
-        packages.ifdyndnsd = naersk-lib.buildPackage {
+        packages.ifdyndnsd = pkgs.rustPlatform.buildRustPackage {
           pname = "ifdyndnsd";
+          version = (
+            pkgs.lib.importTOML ./Cargo.toml
+          ).package.version + "-" + self.lastModifiedDate;
           src = ./.;
-          cargoTestCommands = x:
-            x ++ [
-              # clippy
-              ''
-                cargo clippy --all --all-features --tests -- \
+          cargoLock.lockFile = ./Cargo.lock;
+          nativeBuildInputs = with pkgs; [ clippy rustfmt ];
+          postCheck = ''
+              cargo clippy --all --all-features --tests -- \
                               -D clippy::pedantic \
                               -D warnings \
-                              -A clippy::await-holding-refcell-ref''
-              # rustfmt
-              "cargo fmt -- --check"
-            ];
+                              -A clippy::await-holding-refcell-ref
+              cargo fmt -- --check
+          '';
         };
         defaultPackage = packages.ifdyndnsd;
 
