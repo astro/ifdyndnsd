@@ -22,7 +22,7 @@ in {
     configFile = mkOption {
       type = types.path;
       default = pkgs.writers.writeTOML "ifdyndnsd.toml" cfg.config;
-      defaultText = ''builtins.toFile "ifdyndnsd.toml" cfg.config;'';
+      defaultText = lib.literalExpression ''pkgs.writers.writeTOML "ifdyndnsd.toml" config.services.ifdyndnsd.config;'';
     };
     package = mkOption {
       type = types.package;
