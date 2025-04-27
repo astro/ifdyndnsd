@@ -16,7 +16,7 @@ in {
       default = [];
     };
     config.aaaa = mkOption {
-      type = with types; listOf (attrsOf (either str int));
+      type = with types; listOf (attrsOf (oneOf [ str int (attrsOf str)]));
       default = [];
     };
     configFile = mkOption {
