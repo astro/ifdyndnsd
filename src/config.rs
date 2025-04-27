@@ -7,6 +7,7 @@ use std::io::Read;
 use std::net::{IpAddr, Ipv6Addr};
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TsigKey {
     pub server: IpAddr,
     pub name: String,
@@ -56,6 +57,7 @@ impl TsigKey {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct UpdateTask {
     pub key: String,
     pub name: Option<String>,
@@ -67,11 +69,13 @@ pub struct UpdateTask {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     pub keys: HashMap<String, TsigKey>,
     pub a: Option<Vec<UpdateTask>>,
     pub aaaa: Option<Vec<UpdateTask>>,
 }
+
 /// # Errors
 ///
 /// Will return `Err` if

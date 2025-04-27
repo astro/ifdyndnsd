@@ -7,10 +7,18 @@ async fn main() -> Result<(), String> {
     env_logger::init_from_env(env);
 
     let args = std::env::args().collect::<Vec<_>>();
-    if args.len() != 2 {
-        error!("Usage: {} <config.toml>", args[0]);
-        std::process::exit(1);
+    match &args[1..] {
+        [command, config_file] if command == "--test" => {
+            ifdyndnsd::config::load(config_file).unwrap();
+            Ok(())
+        }
+        [config_file] => {
+            ifdyndnsd::run(config_file).await.unwrap();
+            panic!("ifdyndnsd exited");
+        }
+        _ => {
+            error!("Usage: {} [--test] <config.toml>", args[0]);
+            std::process::exit(1);
+        }
     }
-    let config_file = &args[1];
-    ifdyndnsd::run(config_file).await
 }

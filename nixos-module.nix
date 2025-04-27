@@ -1,5 +1,15 @@
-{ pkgs, config, lib, ... }: let
+{ pkgs, config, lib, ... }:
+
+let
   cfg = config.services.ifdyndnsd;
+
+  configFileChecked = pkgs.runCommand "ifdyndnsd.conf" {
+    preferLocalBuild = true;
+    src = cfg.configFile;
+  } ''
+    ${cfg.package}/bin/ifdyndnsd --test $src
+    cp $src $out
+  '';
 
 in {
   options.services.ifdyndnsd = with lib; {
@@ -54,7 +64,7 @@ in {
       environment.RUST_LOG = "ifdyndnsd=${cfg.logLevel}";
       serviceConfig = {
         Type = "simple";
-        ExecStart = "${cfg.package}/bin/ifdyndnsd ${cfg.configFile}";
+        ExecStart = "${cfg.package}/bin/ifdyndnsd ${configFileChecked}";
         User = cfg.user;
         Group = cfg.group;
         Restart = "always";
