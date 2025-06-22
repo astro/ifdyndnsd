@@ -3,8 +3,9 @@ use base64::Engine;
 use serde_derive::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::Read;
+use std::io::{BufReader, Read};
 use std::net::{IpAddr, Ipv6Addr};
+use std::result::Result;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -34,8 +35,8 @@ impl TsigKey {
             (Some(secret), None, None,None) => secret.bytes().collect::<Vec<u8>>(),
             (None, Some(secret_base64), None, None) => general_purpose::STANDARD.decode(secret_base64).unwrap(),
             (None, None, Some(secret_file), None) => {
-                let file = File::open(secret_file).map_err(|e| format!("Failed to open the specified secret-file: {e}")).unwrap();
-                file.bytes().map(std::result::Result::unwrap).collect()
+                let file = BufReader::new(File::open(secret_file).map_err(|e| format!("Failed to open the specified secret-file: {e}")).unwrap());
+                file.bytes().map(Result::unwrap).collect()
             },
             (None, None, None, Some(secret_file_base64)) => {
                 let mut file = File::open(secret_file_base64).map_err(|e| format!("Failed to open the specified secret-file-base64: {e}")).unwrap();
