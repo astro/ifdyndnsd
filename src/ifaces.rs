@@ -61,7 +61,7 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
         .try_for_each(|m| {
             let index = m.header.index;
             if let Some(name) = link_message_name(&m) {
-                interface_names.insert(index, name.to_string());
+                interface_names.insert(index, name.clone());
             }
             ok(())
         })
@@ -96,7 +96,7 @@ async fn run(tx: &mut Sender<(String, IpAddr)>) -> Result<(), String> {
             NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewLink(m)) => {
                 let index = m.header.index;
                 if let Some(name) = link_message_name(&m) {
-                    interface_names.insert(index, name.to_string());
+                    interface_names.insert(index, name.clone());
                 }
             }
             NetlinkPayload::InnerMessage(RouteNetlinkMessage::DelLink(m)) => {
