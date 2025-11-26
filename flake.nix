@@ -33,14 +33,6 @@
             ln -s ${./Cargo.lock} $out/Cargo.lock
           '';
           cargoLock.lockFile = ./Cargo.lock;
-          nativeBuildInputs = with pkgs; [ clippy rustfmt ];
-          postCheck = ''
-              cargo clippy --all --all-features --tests -- \
-                              -D clippy::pedantic \
-                              -D warnings \
-                              -A clippy::await-holding-refcell-ref
-              cargo fmt -- --check
-          '';
         };
         defaultPackage = packages.ifdyndnsd;
 
@@ -62,8 +54,8 @@
         # `nix develop`
         devShell = pkgs.mkShell {
           nativeBuildInputs = with defaultPackage;
-            nativeBuildInputs ++ buildInputs;
-          packages = with pkgs; [ cargo-edit rust-analyzer ];
+            nativeBuildInputs ++ buildInputs
+            ++ (with pkgs; [ cargo-edit clippy rust-analyzer rustfmt ]);
         };
       }) // {
         overlay = final: prev: { inherit (self.packages.${prev.stdenv.system}) ifdyndnsd; };

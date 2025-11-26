@@ -25,3 +25,9 @@ log = "0.4"
 env_logger = "0.11"
 netlink-sys = "0.8"
 netlink-packet-core = "0.7"
+
+[lints.rust]
+warnings = "deny"
+[lints.clippy]
+await-holding-refcell-ref = "allow"
+pedantic = { level = "deny", priority = -1 }
