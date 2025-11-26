@@ -1,4 +1,4 @@
-{ nixosTest, writeText }:
+{ testers, writeText }:
 
 let
   name = "client.example.net";
@@ -10,7 +10,7 @@ let
   server4 = "192.168.0.1";
   server6 = "fd00::1";
 in
-nixosTest {
+testers.nixosTest {
   name = "ifdyndnsd";
 
   nodes.server = {
